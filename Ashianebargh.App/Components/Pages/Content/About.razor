@@ -1,0 +1,72 @@
+@page "/content/about"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = Ashianebargh.Domain.Content.ContentPermissions.Pages)]
+@using Microsoft.AspNetCore.Authorization
+@using Ashianebargh.Application.Content
+@using Ashianebargh.Domain.Content
+<PageTitle>درباره ما</PageTitle>
+
+<div class="mb-3">
+    <h3 class="mb-1">صفحهٔ درباره ما</h3>
+    <div class="text-body-secondary small">
+        این صفحه آدرس ثابت <code dir="ltr">/about</code> را دارد و همیشه در منوی سایت نمایش داده می‌شود.
+    </div>
+</div>
+
+<div class="card-panel">
+    @if (model is null)
+    {
+        <LoadingSkeleton />
+    }
+    else
+    {
+        <EditForm Model="model" OnValidSubmit="SaveAsync">
+            <DataAnnotationsValidator />
+            <div class="row">
+                <div class="col-md-6">
+                    <AppTextField Label="عنوان" @bind-Value="model.Title" />
+                </div>
+                <div class="col-md-6 d-flex align-items-end pb-2">
+                    <AppCheckbox Label="منتشرشده (در سایت دیده شود)" @bind-Value="model.IsPublished" />
+                </div>
+            </div>
+
+            <AppTextArea Label="متن درباره ما" @bind-Value="model.Content" Rows="16"
+                         Hint="معرفی شرکت، سابقه، خدمات و… — خط‌های خالی به پاراگراف تبدیل می‌شوند." />
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary" disabled="@saving">@(saving ? "در حال ذخیره…" : "ذخیره")</button>
+                <a href="/about" target="_blank" class="btn btn-outline-secondary">نمایش در سایت</a>
+            </div>
+        </EditForm>
+    }
+</div>
+
+@code {
+    private PageEditDto? model;
+    private bool saving;
+
+    [Inject] private IPageService Service { get; set; } = default!;
+    [Inject] private Ashianebargh.App.Services.ToastService ToastService { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+        => model = await Service.GetAboutForEditAsync();
+
+    private async Task SaveAsync()
+    {
+        saving = true;
+        try
+        {
+            await Service.SaveAboutAsync(model!);
+            ToastService.ShowSuccess("صفحهٔ درباره ما ذخیره شد.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError(ErrorMessageHelper.ToUserMessage(ex));
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+}

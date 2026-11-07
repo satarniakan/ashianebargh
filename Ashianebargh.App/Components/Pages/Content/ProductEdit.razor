@@ -1,0 +1,252 @@
+@page "/content/products/new"
+@page "/content/products/{Id:int}"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = Ashianebargh.Domain.Content.ContentPermissions.Products)]
+@using Microsoft.AspNetCore.Authorization
+@using Ashianebargh.Application.Content
+@using Ashianebargh.Domain.Content
+@using Ashianebargh.Domain.Interfaces
+<PageTitle>@(Id > 0 ? "ویرایش محصول" : "محصول جدید")</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">@(Id > 0 ? "ویرایش محصول" : "محصول جدید")</h3>
+    <a href="/content/products" class="btn btn-sm btn-outline-secondary">بازگشت به فهرست</a>
+</div>
+
+@if (model is null)
+{
+    <div class="card-panel"><LoadingSkeleton /></div>
+}
+else
+{
+    <EditForm Model="model" OnValidSubmit="SaveAsync">
+        <DataAnnotationsValidator />
+        <div class="row g-3">
+            <div class="col-lg-8">
+                <div class="card-panel">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <AppTextField Label="نام محصول" @bind-Value="model.Name" />
+                        </div>
+                        <div class="col-md-4">
+                            <AppTextField Label="کد محصول" @bind-Value="model.Code" />
+                        </div>
+                    </div>
+                    <AppTextField Label="نامک (آدرس صفحه)" @bind-Value="model.Slug"
+                                  Hint="خالی بگذارید تا از نام ساخته شود. باید یکتا باشد." />
+                    <AppTextArea Label="توضیح کوتاه (کارت محصول)" @bind-Value="model.ShortDescription"
+                                 Rows="2" ShowCount />
+                    <AppTextArea Label="توضیحات کامل" @bind-Value="model.Description" Rows="8" />
+                </div>
+
+                <div class="card-panel mt-3">
+                    <h5 class="mb-3">برچسب‌ها</h5>
+                    @if (tags.Count == 0)
+                    {
+                        <div class="text-body-secondary small">هنوز برچسبی تعریف نشده است.</div>
+                    }
+                    else
+                    {
+                        <div class="d-flex flex-wrap gap-3">
+                            @foreach (var tag in tags)
+                            {
+                                <label class="form-check mb-0">
+                                    <input type="checkbox" class="form-check-input"
+                                           checked="@model.TagIds.Contains(tag.Id)"
+                                           @onchange="e => ToggleTag(tag.Id, (bool)(e.Value ?? false))" />
+                                    <span class="form-check-label">@tag.Name</span>
+                                </label>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card-panel">
+                    <AppDropdown TValue="int" Label="دسته" @bind-Value="model.CategoryId">
+                        <option value="0">— انتخاب دسته —</option>
+                        @foreach (var c in categories)
+                        {
+                            <option value="@c.Id">@c.Name</option>
+                        }
+                    </AppDropdown>
+
+                    <div class="mb-3">
+                        <label class="form-label">قیمت (تومان)</label>
+                        <InputNumber class="form-control text-end" @bind-Value="model.Price"
+                                     placeholder="خالی = تماس بگیرید" />
+                        <ValidationMessage For="() => model.Price" class="text-danger small mt-1 d-block" />
+                        <div class="form-text">خالی بگذارید تا در سایت «تماس بگیرید» نمایش داده شود.</div>
+                    </div>
+
+                    <AppNumberField TValue="int" Label="ترتیب نمایش" @bind-Value="model.SortOrder" />
+
+                    <AppCheckbox Label="فعال (در سایت دیده شود)" @bind-Value="model.IsActive" />
+                    <AppCheckbox Label="محصول ویژه (نمایش در صفحهٔ اول)" @bind-Value="model.IsFeatured" />
+                </div>
+
+                <div class="card-panel mt-3">
+                    <h5 class="mb-3">تصویر اصلی</h5>
+                    @if (!string.IsNullOrEmpty(ImagePreviewId))
+                    {
+                        <img src="/media/products/@ImagePreviewId" alt="@model.Name"
+                             class="product-image-preview mb-3" />
+                    }
+                    else
+                    {
+                        <div class="text-body-secondary small mb-3">تصویری انتخاب نشده است.</div>
+                    }
+                    <div class="d-flex flex-wrap gap-2">
+                        <label class="btn btn-sm btn-outline-primary mb-0" title="JPG، PNG یا WebP">
+                            <i class="bi bi-upload me-1"></i>انتخاب تصویر
+                            <InputFile accept=".jpg,.jpeg,.png,.webp,.gif" OnChange="UploadAsync" style="display:none;" />
+                        </label>
+                        @if (!string.IsNullOrEmpty(ImagePreviewId))
+                        {
+                            <button type="button" class="btn btn-sm btn-outline-danger" @onclick="RemoveImageAsync">حذف تصویر</button>
+                        }
+                    </div>
+                    @if (uploading)
+                    {
+                        <div class="form-text mt-2">در حال بارگذاری…</div>
+                    }
+                </div>
+
+                <div class="card-panel mt-3">
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary" disabled="@saving">@(saving ? "در حال ذخیره…" : "ذخیره")</button>
+                        <a href="/content/products" class="btn btn-outline-secondary">انصراف</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private ProductEditDto? model;
+    private List<CategoryListItemDto> categories = new();
+    private List<TagListItemDto> tags = new();
+    private string? pendingImageId;
+    private bool saving;
+    private bool uploading;
+
+    private string? ImagePreviewId => pendingImageId ?? model?.MainImageStorageId;
+
+    [Inject] private IProductService Service { get; set; } = default!;
+    [Inject] private ICategoryService CategoryService { get; set; } = default!;
+    [Inject] private ITagService TagService { get; set; } = default!;
+    [Inject] private IFileStorage Storage { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private Ashianebargh.App.Services.ToastService ToastService { get; set; } = default!;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        categories = await CategoryService.GetAllAsync();
+        tags = await TagService.GetAllAsync();
+
+        if (Id > 0)
+        {
+            model = await Service.GetForEditAsync(Id);
+            if (model is null)
+            {
+                ToastService.ShowError("محصول یافت نشد.");
+                Navigation.NavigateTo("/content/products");
+            }
+        }
+        else
+        {
+            model = new ProductEditDto();
+        }
+    }
+
+    private void ToggleTag(int tagId, bool selected)
+    {
+        if (model is null) return;
+        if (selected && !model.TagIds.Contains(tagId)) model.TagIds.Add(tagId);
+        if (!selected) model.TagIds.Remove(tagId);
+    }
+
+    private async Task UploadAsync(InputFileChangeEventArgs e)
+    {
+        if (model is null) return;
+        uploading = true;
+        try
+        {
+            var file = e.File;
+            await using var stream = file.OpenReadStream(5 * 1024 * 1024);
+            var storageId = await Storage.SaveAsync(
+                ContentStorage.Owner, ContentStorage.ProductImageType,
+                stream, file.Name, file.ContentType);
+
+            if (model.Id > 0)
+            {
+                // محصول موجود: جایگزینی فوری تا فایل قبلی هم پاک شود
+                await Service.SetImageAsync(model.Id, storageId);
+                model.MainImageStorageId = storageId;
+                pendingImageId = null;
+            }
+            else
+            {
+                // محصول جدید: پس از ذخیره به آن وصل می‌شود
+                pendingImageId = storageId;
+            }
+
+            ToastService.ShowSuccess("تصویر بارگذاری شد.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError(ErrorMessageHelper.ToUserMessage(ex));
+        }
+        finally
+        {
+            uploading = false;
+        }
+    }
+
+    private async Task RemoveImageAsync()
+    {
+        if (model is null) return;
+        try
+        {
+            if (model.Id > 0)
+                await Service.SetImageAsync(model.Id, null);
+            else if (pendingImageId is not null)
+                await Storage.DeleteAsync(ContentStorage.Owner, ContentStorage.ProductImageType, pendingImageId);
+
+            pendingImageId = null;
+            model.MainImageStorageId = null;
+            ToastService.ShowSuccess("تصویر حذف شد.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError(ErrorMessageHelper.ToUserMessage(ex));
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (model is null) return;
+        saving = true;
+        try
+        {
+            var id = await Service.SaveAsync(model);
+            if (pendingImageId is not null)
+                await Service.SetImageAsync(id, pendingImageId);
+
+            ToastService.ShowSuccess("محصول ذخیره شد.");
+            Navigation.NavigateTo("/content/products");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError(ErrorMessageHelper.ToUserMessage(ex));
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+}

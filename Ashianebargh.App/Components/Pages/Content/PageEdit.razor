@@ -1,0 +1,100 @@
+@page "/content/pages/new"
+@page "/content/pages/{Id:int}"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = Ashianebargh.Domain.Content.ContentPermissions.Pages)]
+@using Microsoft.AspNetCore.Authorization
+@using Ashianebargh.Application.Content
+@using Ashianebargh.Domain.Content
+<PageTitle>@(Id > 0 ? "ویرایش صفحه" : "صفحهٔ جدید")</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">@(Id > 0 ? "ویرایش صفحه" : "صفحهٔ جدید")</h3>
+    <a href="/content/pages" class="btn btn-sm btn-outline-secondary">بازگشت به فهرست</a>
+</div>
+
+<div class="card-panel">
+    @if (model is null)
+    {
+        <LoadingSkeleton />
+    }
+    else
+    {
+        <EditForm Model="model" OnValidSubmit="SaveAsync">
+            <DataAnnotationsValidator />
+            <div class="row">
+                <div class="col-md-6">
+                    <AppTextField Label="عنوان صفحه" @bind-Value="model.Title" />
+                </div>
+                <div class="col-md-6">
+                    <AppTextField Label="نامک (آدرس)" @bind-Value="model.Slug"
+                                  Hint="مثلاً garranty؛ خالی بگذارید تا از عنوان ساخته شود." />
+                </div>
+            </div>
+
+            <AppTextArea Label="متن صفحه" @bind-Value="model.Content" Rows="14"
+                         Hint="متن ساده؛ خط‌های خالی به پاراگراف تبدیل می‌شوند." />
+
+            <div class="row">
+                <div class="col-md-4">
+                    <AppNumberField TValue="int" Label="ترتیب نمایش" @bind-Value="model.SortOrder" />
+                </div>
+                <div class="col-md-8 d-flex flex-column justify-content-end">
+                    <AppCheckbox Label="منتشرشده (در سایت دیده شود)" @bind-Value="model.IsPublished" />
+                    <AppCheckbox Label="نمایش در منوی سایت" @bind-Value="model.ShowInMenu" />
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary" disabled="@saving">@(saving ? "در حال ذخیره…" : "ذخیره")</button>
+                <a href="/content/pages" class="btn btn-outline-secondary">انصراف</a>
+            </div>
+        </EditForm>
+    }
+</div>
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private PageEditDto? model;
+    private bool saving;
+
+    [Inject] private IPageService Service { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private Ashianebargh.App.Services.ToastService ToastService { get; set; } = default!;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Id > 0)
+        {
+            model = await Service.GetAsync(Id);
+            if (model is null)
+            {
+                ToastService.ShowError("صفحه یافت نشد.");
+                Navigation.NavigateTo("/content/pages");
+            }
+        }
+        else
+        {
+            model = new PageEditDto();
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        saving = true;
+        try
+        {
+            await Service.SaveAsync(model!);
+            ToastService.ShowSuccess("صفحه ذخیره شد.");
+            Navigation.NavigateTo("/content/pages");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError(ErrorMessageHelper.ToUserMessage(ex));
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+}

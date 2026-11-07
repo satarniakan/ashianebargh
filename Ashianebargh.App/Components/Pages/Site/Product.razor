@@ -1,0 +1,156 @@
+@page "/product/{Slug}"
+@layout SiteLayout
+@using Ashianebargh.Application.Content
+@using Ashianebargh.Application.Helpers
+@inject IProductService ProductService
+@inject ICategoryService CategoryService
+
+@if (product is null)
+{
+    <PageTitle>محصول یافت نشد | آشیانه برق</PageTitle>
+    <div class="site-container">
+        <div class="site-empty">
+            <i class="bi bi-box-seam"></i>
+            <p>این محصول وجود ندارد یا فعلاً غیرفعال است.</p>
+            <a href="/products" class="btn btn-sm btn-outline-secondary">بازگشت به محصولات</a>
+        </div>
+    </div>
+}
+else
+{
+    <PageTitle>@product.Name | آشیانه برق</PageTitle>
+
+    <div class="site-container">
+        <nav class="site-breadcrumb" aria-label="مسیر">
+            <a href="/">خانه</a>
+            <span class="sep">/</span>
+            <a href="/products">محصولات</a>
+            <span class="sep">/</span>
+            <a href="/products?category=@product.CategorySlug">@product.CategoryName</a>
+            <span class="sep">/</span>
+            <span class="current">@product.Name</span>
+        </nav>
+
+        <div class="site-detail-layout">
+            <aside class="site-side">
+                <div class="site-side-head"><h2>دسته‌بندی‌ها</h2></div>
+                <nav class="site-side-nav" aria-label="دسته‌بندی محصولات">
+                    <a href="/products">
+                        <span class="site-side-icon"><i class="bi bi-grid-3x3-gap"></i></span>
+                        <span class="site-side-name">همهٔ محصولات</span>
+                    </a>
+                    @foreach (var category in categories)
+                    {
+                        <a class="@(category.Slug == product.CategorySlug ? "on" : "")"
+                           href="/products?category=@category.Slug">
+                            <span class="site-side-icon"><i class="bi bi-diagram-3"></i></span>
+                            <span class="site-side-name">@category.Name</span>
+                            <span class="site-side-count">@category.ProductCount</span>
+                        </a>
+                    }
+                </nav>
+            </aside>
+
+            <section class="site-panel">
+                <div class="site-detail-top">
+                    <div class="site-detail-info">
+                        <span class="site-detail-cat"><i class="bi bi-diagram-3"></i>@product.CategoryName</span>
+                        <h1 class="site-detail-title">@product.Name</h1>
+
+                        @if (!string.IsNullOrWhiteSpace(product.Code))
+                        {
+                            <div class="site-detail-code">کد محصول: <b>@product.Code</b></div>
+                        }
+
+                        @if (!string.IsNullOrWhiteSpace(product.ShortDescription))
+                        {
+                            <p>@product.ShortDescription</p>
+                        }
+
+                        <div class="site-detail-price">
+                            <i class="bi bi-tag"></i>
+                            @(product.Price is null ? "برای اطلاع از قیمت تماس بگیرید" : CurrencyFormatter.ToToman(product.Price.Value))
+                        </div>
+
+                        @if (product.Tags.Count > 0)
+                        {
+                            <div class="site-detail-tags">
+                                @foreach (var tag in product.Tags)
+                                {
+                                    <a href="/products?tag=@tag.Slug" class="site-tag">@tag.Name</a>
+                                }
+                            </div>
+                        }
+
+                        <div class="site-actions-row">
+                            <a href="/contact" class="site-btn site-btn--red"><i class="bi bi-send"></i>استعلام و سفارش</a>
+                            <a href="/products" class="site-btn site-btn--navy"><i class="bi bi-grid"></i>سایر محصولات</a>
+                        </div>
+                    </div>
+
+                    <div class="site-detail-media">
+                        @if (!string.IsNullOrEmpty(product.MainImageStorageId))
+                        {
+                            <img src="/media/products/@product.MainImageStorageId" alt="@product.Name" />
+                        }
+                        else
+                        {
+                            <span class="site-detail-placeholder"><i class="bi bi-box-seam"></i></span>
+                        }
+                    </div>
+                </div>
+
+                <h2 class="site-subhead">مشخصات محصول</h2>
+                <div class="site-table-wrap">
+                    <table class="site-table">
+                        <thead>
+                            <tr>
+                                <th>ویژگی</th>
+                                <th>مقدار</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>کد محصول</td>
+                                <td class="ltr">@(string.IsNullOrWhiteSpace(product.Code) ? "—" : product.Code)</td>
+                            </tr>
+                            <tr>
+                                <td>دسته‌بندی</td>
+                                <td>@product.CategoryName</td>
+                            </tr>
+                            <tr>
+                                <td>قیمت</td>
+                                <td>@(product.Price is null ? "تماس بگیرید" : CurrencyFormatter.ToToman(product.Price.Value))</td>
+                            </tr>
+                            <tr>
+                                <td>برچسب‌ها</td>
+                                <td>@(product.Tags.Count == 0 ? "—" : string.Join("، ", product.Tags.Select(t => t.Name)))</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(product.Description))
+                {
+                    <h2 class="site-subhead">توضیحات</h2>
+                    <div class="site-detail-desc">
+                        <ContentParagraphs Text="@product.Description" />
+                    </div>
+                }
+            </section>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string Slug { get; set; } = string.Empty;
+
+    private ProductDetailsDto? product;
+    private List<CategoryListItemDto> categories = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        product = await ProductService.GetPublicBySlugAsync(Slug);
+        categories = await CategoryService.GetActiveAsync();
+    }
+}

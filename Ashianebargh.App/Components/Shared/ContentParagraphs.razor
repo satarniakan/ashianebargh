@@ -1,0 +1,14 @@
+@* نمایش متن سادهٔ صفحه/محصول: هر خط غیرخالی یک پاراگراف. *@
+@if (!string.IsNullOrWhiteSpace(Text))
+{
+    <div class="content-prose">
+        @foreach (var paragraph in Text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            <p>@paragraph</p>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public string? Text { get; set; }
+}

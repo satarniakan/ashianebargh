@@ -1,0 +1,110 @@
+@page "/content/pages"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = Ashianebargh.Domain.Content.ContentPermissions.Pages)]
+@using Microsoft.AspNetCore.Authorization
+@using Ashianebargh.Application.Content
+@using Ashianebargh.Domain.Content
+<PageTitle>صفحات</PageTitle>
+
+<div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
+    <div>
+        <h3 class="mb-1">صفحات سایت</h3>
+        <div class="text-body-secondary small">صفحات دلخواه مثل «قوانین»، «گارانتی» و…؛ هر صفحه آدرس یکتای خودش را دارد.</div>
+    </div>
+    <a href="/content/pages/new" class="btn btn-primary btn-sm">صفحهٔ جدید</a>
+</div>
+
+<div class="card-panel">
+    @if (items is null)
+    {
+        <LoadingSkeleton />
+    }
+    else if (items.Count == 0)
+    {
+        <div class="text-center text-body-secondary py-4">
+            <i class="bi bi-file-earmark-text fs-3 d-block mb-2"></i>
+            <span class="small">هنوز صفحه‌ای ساخته نشده است.</span>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table mb-0">
+                <thead>
+                    <tr>
+                        <th>عنوان</th>
+                        <th>آدرس</th>
+                        <th>وضعیت</th>
+                        <th>در منو</th>
+                        <th>ترتیب</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in items)
+                    {
+                        <tr>
+                            <td>@item.Title</td>
+                            <td dir="ltr" class="text-end">/@item.Slug</td>
+                            <td>
+                                @if (item.IsPublished)
+                                {
+                                    <span class="badge text-bg-success">منتشرشده</span>
+                                }
+                                else
+                                {
+                                    <span class="badge text-bg-secondary">پیش‌نویس</span>
+                                }
+                            </td>
+                            <td>@(item.ShowInMenu ? "بله" : "خیر")</td>
+                            <td>@item.SortOrder</td>
+                            <td class="text-end">
+                                <div class="d-inline-flex gap-1">
+                                    @if (item.IsPublished)
+                                    {
+                                        <a href="/@item.Slug" target="_blank" class="btn btn-sm btn-outline-secondary">نمایش</a>
+                                    }
+                                    <a href="/content/pages/@item.Id" class="btn btn-sm btn-outline-primary">ویرایش</a>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => AskDelete(item)">حذف</button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<AppConfirmDialog @ref="confirmDialog" />
+
+@code {
+    private List<PageListItemDto>? items;
+    private AppConfirmDialog confirmDialog = default!;
+
+    [Inject] private IPageService Service { get; set; } = default!;
+    [Inject] private Ashianebargh.App.Services.ToastService ToastService { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync() => items = await Service.GetAllAsync();
+
+    private async Task AskDelete(PageListItemDto item)
+    {
+        var confirmed = await confirmDialog.ShowAsync(
+            "حذف صفحه",
+            $"صفحهٔ «{item.Title}» حذف شود؟");
+        if (!confirmed) return;
+
+        try
+        {
+            await Service.DeleteAsync(item.Id);
+            ToastService.ShowSuccess("صفحه حذف شد.");
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError(ErrorMessageHelper.ToUserMessage(ex));
+        }
+    }
+}

@@ -1,0 +1,211 @@
+@page "/contact"
+@layout SiteLayout
+@rendermode InteractiveServer
+@using Ashianebargh.Application.Content
+@inject IContactService ContactService
+<PageTitle>تماس با ما | آشیانه برق</PageTitle>
+
+<div class="site-container">
+    <div class="site-page-head">
+        <nav class="site-breadcrumb" aria-label="مسیر">
+            <a href="/">خانه</a>
+            <span class="sep">/</span>
+            <span class="current">تماس با ما</span>
+        </nav>
+        <h1>تماس با ما</h1>
+        <p>برای استعلام قیمت، مشاورهٔ فنی یا پیگیری سفارش، از راه‌های زیر با ما در ارتباط باشید.</p>
+    </div>
+
+    @if (info is null)
+    {
+        <div class="site-contact">
+            <div class="site-panel">
+                <LoadingSkeleton />
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="site-contact">
+            <div class="site-panel">
+                <div class="site-panel-title">
+                    <span class="site-panel-icon"><i class="bi bi-geo-alt"></i></span>
+                    اطلاعات تماس ما
+                </div>
+
+                <div class="site-info-list">
+                    @if (!string.IsNullOrWhiteSpace(info.Address))
+                    {
+                        <div class="site-info-item">
+                            <i class="bi bi-geo-alt"></i>
+                            <div>
+                                <div class="site-info-label">نشانی</div>
+                                <div class="site-info-value">@info.Address</div>
+                            </div>
+                        </div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(info.Phone))
+                    {
+                        <div class="site-info-item">
+                            <i class="bi bi-telephone"></i>
+                            <div>
+                                <div class="site-info-label">تلفن</div>
+                                <div class="site-info-value"><a href="tel:@info.Phone" dir="ltr">@info.Phone</a></div>
+                            </div>
+                        </div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(info.Mobile))
+                    {
+                        <div class="site-info-item">
+                            <i class="bi bi-phone"></i>
+                            <div>
+                                <div class="site-info-label">همراه</div>
+                                <div class="site-info-value"><a href="tel:@info.Mobile" dir="ltr">@info.Mobile</a></div>
+                            </div>
+                        </div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(info.Email))
+                    {
+                        <div class="site-info-item">
+                            <i class="bi bi-envelope"></i>
+                            <div>
+                                <div class="site-info-label">ایمیل</div>
+                                <div class="site-info-value"><a href="mailto:@info.Email" dir="ltr">@info.Email</a></div>
+                            </div>
+                        </div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(info.WorkingHours))
+                    {
+                        <div class="site-info-item">
+                            <i class="bi bi-clock"></i>
+                            <div>
+                                <div class="site-info-label">ساعات کاری</div>
+                                <div class="site-info-value">@info.WorkingHours</div>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                @if (socialLinks.Count > 0)
+                {
+                    <div class="site-social">
+                        @foreach (var link in socialLinks)
+                        {
+                            <a href="@link.Url" target="_blank" rel="noopener noreferrer" title="@link.Title" aria-label="@link.Title">
+                                <i class="bi @link.Icon"></i>
+                            </a>
+                        }
+                    </div>
+                }
+            </div>
+
+            <div class="site-panel site-form">
+                <div class="site-panel-title">
+                    <span class="site-panel-icon"><i class="bi bi-envelope-paper"></i></span>
+                    برای ما پیام بفرستید
+                </div>
+
+                @if (submitted)
+                {
+                    <div class="alert alert-success">
+                        پیام شما ثبت شد؛ در اولین فرصت پاسخ می‌دهیم.
+                        <button class="btn btn-sm btn-outline-success ms-2" @onclick="() => submitted = false">ارسال پیام دیگر</button>
+                    </div>
+                }
+
+                @if (!submitted)
+                {
+                    <EditForm Model="form" OnValidSubmit="SubmitAsync">
+                        <DataAnnotationsValidator />
+                        <div class="site-form-grid">
+                            <AppTextField Label="نام و نام خانوادگی" @bind-Value="form.Name" Required WrapperClass="site-field" />
+                            <AppTextField Label="شماره تماس" @bind-Value="form.Phone" Required WrapperClass="site-field" />
+                            <AppTextField Label="ایمیل (اختیاری)" @bind-Value="form.Email" InputType="email" WrapperClass="site-field" />
+                            <AppTextField Label="موضوع (اختیاری)" @bind-Value="form.Subject" WrapperClass="site-field" />
+                            <AppTextArea Label="متن پیام" @bind-Value="form.Message" Rows="5" Required ShowCount
+                                         WrapperClass="site-field site-field--full" />
+                        </div>
+
+                        <button type="submit" class="btn btn-primary" disabled="@sending">
+                            <i class="bi bi-send me-1"></i>
+                            @(sending ? "در حال ارسال…" : "ارسال پیام")
+                        </button>
+                    </EditForm>
+                }
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(MapUrl))
+        {
+            <div class="site-panel site-map">
+                <div class="site-panel-title">
+                    <span class="site-panel-icon"><i class="bi bi-map"></i></span>
+                    موقعیت ما
+                </div>
+                <iframe src="@MapUrl" loading="lazy" referrerpolicy="no-referrer-when-downgrade"
+                        title="نقشهٔ محل شرکت"></iframe>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private ContactInfoDto? info;
+    private ContactFormDto form = new();
+    private readonly List<(string Title, string Icon, string Url)> socialLinks = new();
+    private bool sending;
+    private bool submitted;
+
+    private string? MapUrl => ToHttpUrl(info?.MapUrl);
+
+    [Inject] private IContactService Service { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        info = await Service.GetInfoAsync();
+
+        AddSocial("اینستاگرام", "bi-instagram", info.Instagram);
+        AddSocial("تلگرام", "bi-telegram", info.Telegram);
+        AddSocial("واتس‌اپ", "bi-whatsapp", info.WhatsApp);
+    }
+
+    private void AddSocial(string title, string icon, string? value)
+    {
+        var url = ToHttpUrl(value);
+        if (url is not null) socialLinks.Add((title, icon, url));
+    }
+
+    /// <summary>ورودی ادمین را به آدرس امن http/https تبدیل می‌کند تا لینک javascript: ممکن نباشد.</summary>
+    private static string? ToHttpUrl(string? value)
+    {
+        var trimmed = value?.Trim();
+        if (string.IsNullOrWhiteSpace(trimmed)) return null;
+
+        if (trimmed.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+            return trimmed;
+
+        return "https://" + trimmed.TrimStart('/');
+    }
+
+    private async Task SubmitAsync()
+    {
+        sending = true;
+        try
+        {
+            await Service.SubmitAsync(form);
+            form = new();
+            submitted = true;
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError(ErrorMessageHelper.ToUserMessage(ex));
+        }
+        finally
+        {
+            sending = false;
+        }
+    }
+
+    [Inject] private Ashianebargh.App.Services.ToastService ToastService { get; set; } = default!;
+}

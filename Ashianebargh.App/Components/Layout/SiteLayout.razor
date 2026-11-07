@@ -1,0 +1,125 @@
+@* قالب عمومی سایت: سربرگ، منوی صفحات پویا و پابرگ. پنل مدیریت قالب جدا دارد. *@
+@inherits LayoutComponentBase
+@using Ashianebargh.Application.Content
+@using Ashianebargh.Application.Services
+@using Ashianebargh.Domain.Identity
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IServiceScopeFactory ScopeFactory
+@inject NavigationManager Nav
+
+<div class="site-shell">
+    <header class="site-header">
+        <div class="site-header-inner">
+            <a class="site-brand" href="/">
+                <span class="site-brand-mark"><i class="bi bi-lightning-charge-fill"></i></span>
+                <span class="site-brand-text">
+                    <span class="site-brand-name">@siteName</span>
+                    <span class="site-brand-sub">تأمین تجهیزات برق و روشنایی</span>
+                </span>
+            </a>
+
+            <nav class="site-nav" aria-label="منوی اصلی">
+                <a href="/" class="@NavClass("/")">صفحه اصلی</a>
+                <a href="/products" class="@NavClass("/products")">محصولات</a>
+                @foreach (var item in menu)
+                {
+                    <a href="/@item.Slug" class="@NavClass("/" + item.Slug)">@item.Title</a>
+                }
+                <a href="/about" class="@NavClass("/about")">درباره ما</a>
+                <a href="/contact" class="@NavClass("/contact")">تماس با ما</a>
+            </nav>
+
+            <div class="site-actions">
+                <a class="site-cta" href="/contact">
+                    <i class="bi bi-send-fill"></i>
+                    <span>درخواست استعلام</span>
+                </a>
+                @if (isAuthenticated)
+                {
+                    <a class="site-login" href="/dashboard"><i class="bi bi-speedometer2"></i><span>پنل مدیریت</span></a>
+                }
+                else
+                {
+                    <a class="site-login" href="/login"><i class="bi bi-person"></i><span>ورود</span></a>
+                }
+            </div>
+        </div>
+    </header>
+
+    <main class="site-main">
+        @Body
+    </main>
+
+    <footer class="site-footer">
+        <div class="site-footer-inner">
+            <div class="site-footer-brand">
+                <a class="site-brand" href="/">
+                    <span class="site-brand-mark"><i class="bi bi-lightning-charge-fill"></i></span>
+                    <span class="site-brand-text">
+                        <span class="site-brand-name">@siteName</span>
+                    </span>
+                </a>
+                <p>@(contact?.WorkingHours ?? "همراه شما برای انتخاب درست")</p>
+            </div>
+
+            <div class="site-footer-info">
+                @if (!string.IsNullOrWhiteSpace(contact?.Address))
+                {
+                    <div><i class="bi bi-geo-alt"></i><span>@contact.Address</span></div>
+                }
+                @if (!string.IsNullOrWhiteSpace(contact?.Phone))
+                {
+                    <div><i class="bi bi-telephone"></i><span dir="ltr">@contact.Phone</span></div>
+                }
+                @if (!string.IsNullOrWhiteSpace(contact?.Email))
+                {
+                    <div><i class="bi bi-envelope"></i><span dir="ltr">@contact.Email</span></div>
+                }
+            </div>
+
+            <div class="site-footer-meta">© @(new System.Globalization.PersianCalendar().GetYear(DateTime.Now)) — @siteName</div>
+        </div>
+    </footer>
+</div>
+
+@code {
+    private string siteName = "آشیانه برق";
+    private List<PageMenuItemDto> menu = new();
+    private ContactInfoDto? contact;
+    private bool isAuthenticated;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Blazor SSR قالب را هم‌زمان با صفحه رندر می‌کند؛ اگر هر دو از DbContext مشترک
+        // درخواست استفاده کنند خطای «second operation on this context» می‌دهند.
+        // پس داده‌های قالب در scope جداگانه (DbContext جدا) خوانده می‌شوند.
+        await using var scope = ScopeFactory.CreateAsyncScope();
+        var settings = scope.ServiceProvider.GetRequiredService<ISettingService>();
+        var pages = scope.ServiceProvider.GetRequiredService<IPageService>();
+        var contacts = scope.ServiceProvider.GetRequiredService<IContactService>();
+
+        siteName = await settings.GetAsync(FrameworkSettingKeys.SiteName) ?? "آشیانه برق";
+
+        var state = await AuthStateProvider.GetAuthenticationStateAsync();
+        isAuthenticated = state.User.Identity?.IsAuthenticated == true;
+
+        menu = await pages.GetMenuAsync();
+        contact = await contacts.GetInfoAsync();
+    }
+
+    private string NavClass(string path) => IsActive(path) ? "on" : string.Empty;
+
+    private bool IsActive(string path)
+    {
+        var current = "/" + Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0].Trim('/');
+        var target = "/" + path.Trim('/');
+
+        if (target == "/")
+        {
+            return current == "/";
+        }
+
+        return current.Equals(target, StringComparison.OrdinalIgnoreCase)
+               || current.StartsWith(target + "/", StringComparison.OrdinalIgnoreCase);
+    }
+}

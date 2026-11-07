@@ -1,0 +1,51 @@
+@page "/about"
+@layout SiteLayout
+@using Ashianebargh.Application.Content
+@inject IPageService PageService
+
+@if (view is null)
+{
+    <PageTitle>درباره ما | آشیانه برق</PageTitle>
+    <div class="site-container">
+        <div class="site-empty">
+            <i class="bi bi-info-circle"></i>
+            <p>محتوای «درباره ما» هنوز تنظیم نشده است.</p>
+        </div>
+    </div>
+}
+else
+{
+    <PageTitle>@view.Title | آشیانه برق</PageTitle>
+
+    <div class="site-container">
+        <div class="site-page-head">
+            <nav class="site-breadcrumb" aria-label="مسیر">
+                <a href="/">خانه</a>
+                <span class="sep">/</span>
+                <span class="current">@view.Title</span>
+            </nav>
+            <h1>@view.Title</h1>
+        </div>
+
+        @if (string.IsNullOrWhiteSpace(view.Content))
+        {
+            <div class="site-empty">
+                <i class="bi bi-file-earmark-text"></i>
+                <p>متنی برای این صفحه ثبت نشده است.</p>
+            </div>
+        }
+        else
+        {
+            <div class="content-panel">
+                <ContentParagraphs Text="@view.Content" />
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private PageViewDto? view;
+
+    protected override async Task OnInitializedAsync()
+        => view = await PageService.GetAboutAsync();
+}

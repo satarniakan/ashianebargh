@@ -1,0 +1,198 @@
+@page "/content/products"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = Ashianebargh.Domain.Content.ContentPermissions.Products)]
+@using Microsoft.AspNetCore.Authorization
+@using Ashianebargh.Application.Content
+@using Ashianebargh.Application.DTOs
+@using Ashianebargh.Domain.Content
+<PageTitle>محصولات</PageTitle>
+
+<div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
+    <div>
+        <h3 class="mb-1">محصولات</h3>
+        <div class="text-body-secondary small">مدیریت محصولات، تصویر، قیمت و وضعیت نمایش در سایت</div>
+    </div>
+    <a href="/content/products/new" class="btn btn-primary btn-sm">محصول جدید</a>
+</div>
+
+<div class="card-panel mb-3">
+    <div class="row g-2 align-items-end">
+        <div class="col-md-5">
+            <label class="form-label small mb-1">جست‌وجو</label>
+            <input class="form-control form-control-sm" placeholder="نام یا کد محصول…"
+                   @bind="filter.Search" @bind:event="oninput" @onkeyup="OnSearchKeyUp" />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small mb-1">دسته</label>
+            <select class="form-select form-select-sm" @bind="categoryId">
+                <option value="">همهٔ دسته‌ها</option>
+                @foreach (var c in categories)
+                {
+                    <option value="@c.Id">@c.Name</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small mb-1">برچسب</label>
+            <select class="form-select form-select-sm" @bind="tagId">
+                <option value="">همهٔ برچسب‌ها</option>
+                @foreach (var t in tags)
+                {
+                    <option value="@t.Id">@t.Name</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-1">
+            <button class="btn btn-sm btn-outline-secondary w-100" @onclick="SearchAsync">فیلتر</button>
+        </div>
+    </div>
+</div>
+
+<div class="card-panel">
+    @if (page is null)
+    {
+        <LoadingSkeleton />
+    }
+    else if (!page.Items.Any())
+    {
+        <div class="text-center text-body-secondary py-4">
+            <i class="bi bi-box-seam fs-3 d-block mb-2"></i>
+            <span class="small">محصولی یافت نشد.</span>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th>تصویر</th>
+                        <th>نام</th>
+                        <th>کد</th>
+                        <th>دسته</th>
+                        <th>قیمت</th>
+                        <th>وضعیت</th>
+                        <th>ترتیب</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in page.Items)
+                    {
+                        <tr>
+                            <td>
+                                @if (!string.IsNullOrEmpty(item.MainImageStorageId))
+                                {
+                                    <img src="/media/products/@item.MainImageStorageId" alt="@item.Name"
+                                         class="product-thumb" />
+                                }
+                                else
+                                {
+                                    <span class="text-body-secondary small">—</span>
+                                }
+                            </td>
+                            <td>
+                                @item.Name
+                                @if (item.IsFeatured)
+                                {
+                                    <span class="badge text-bg-info ms-1">ویژه</span>
+                                }
+                            </td>
+                            <td dir="ltr" class="text-end">@item.Code</td>
+                            <td>@item.CategoryName</td>
+                            <td>@(item.Price is null ? "تماس بگیرید" : CurrencyFormatter.ToToman(item.Price.Value))</td>
+                            <td>
+                                @if (item.IsActive)
+                                {
+                                    <span class="badge text-bg-success">فعال</span>
+                                }
+                                else
+                                {
+                                    <span class="badge text-bg-secondary">غیرفعال</span>
+                                }
+                            </td>
+                            <td>@item.SortOrder</td>
+                            <td class="text-end">
+                                <div class="d-inline-flex gap-1">
+                                    <a href="/product/@item.Slug" target="_blank" class="btn btn-sm btn-outline-secondary"
+                                       title="نمایش در سایت">نمایش</a>
+                                    <a href="/content/products/@item.Id" class="btn btn-sm btn-outline-primary">ویرایش</a>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => AskDelete(item)">حذف</button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <Pager CurrentPage="page.Page" TotalPages="page.TotalPages" TotalCount="page.TotalCount"
+               OnPageChanged="GoToPage" />
+    }
+</div>
+
+<AppConfirmDialog @ref="confirmDialog" />
+
+@code {
+    private PagedResult<ProductListItemDto>? page;
+    private List<CategoryListItemDto> categories = new();
+    private List<TagListItemDto> tags = new();
+    private readonly ProductFilter filter = new();
+    private int? categoryId;
+    private int? tagId;
+    private AppConfirmDialog confirmDialog = default!;
+
+    [Inject] private IProductService Service { get; set; } = default!;
+    [Inject] private ICategoryService CategoryService { get; set; } = default!;
+    [Inject] private ITagService TagService { get; set; } = default!;
+    [Inject] private Ashianebargh.App.Services.ToastService ToastService { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        categories = await CategoryService.GetAllAsync();
+        tags = await TagService.GetAllAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        filter.CategoryId = categoryId;
+        filter.TagId = tagId;
+        page = await Service.GetPagedAsync(filter);
+    }
+
+    private async Task SearchAsync()
+    {
+        filter.Page = 1;
+        await LoadAsync();
+    }
+
+    private async Task OnSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await SearchAsync();
+    }
+
+    private async Task GoToPage(int newPage)
+    {
+        filter.Page = newPage;
+        await LoadAsync();
+    }
+
+    private async Task AskDelete(ProductListItemDto item)
+    {
+        var confirmed = await confirmDialog.ShowAsync(
+            "حذف محصول",
+            $"محصول «{item.Name}» حذف شود؟ تصویر آن هم پاک می‌شود.");
+        if (!confirmed) return;
+
+        try
+        {
+            await Service.DeleteAsync(item.Id);
+            ToastService.ShowSuccess("محصول حذف شد.");
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError(ErrorMessageHelper.ToUserMessage(ex));
+        }
+    }
+}

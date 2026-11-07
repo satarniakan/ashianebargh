@@ -1,0 +1,133 @@
+@page "/products"
+@layout SiteLayout
+@using Ashianebargh.Application.Content
+@using Ashianebargh.Application.DTOs
+@inject IProductService ProductService
+@inject ICategoryService CategoryService
+@inject ITagService TagService
+<PageTitle>محصولات | آشیانه برق</PageTitle>
+
+<div class="site-container">
+    <div class="site-page-head">
+        <nav class="site-breadcrumb" aria-label="مسیر">
+            <a href="/">خانه</a>
+            <span class="sep">/</span>
+            <span class="current">محصولات</span>
+        </nav>
+        <h1>محصولات</h1>
+        <p>فهرست محصولات موجود؛ برای مشاهدهٔ جزئیات روی هر کارت کلیک کنید.</p>
+    </div>
+
+    <div class="site-catalog">
+        <aside class="site-side">
+            <div class="site-side-head"><h2>دسته‌بندی‌ها</h2></div>
+            <nav class="site-side-nav" aria-label="دسته‌بندی محصولات">
+                <a class="@(string.IsNullOrEmpty(Category) ? "on" : "")" href="@ListUrl(null, Tag, 1)">
+                    <span class="site-side-icon"><i class="bi bi-grid-3x3-gap"></i></span>
+                    <span class="site-side-name">همهٔ محصولات</span>
+                </a>
+                @foreach (var category in categories)
+                {
+                    <a class="@(Category == category.Slug ? "on" : "")" href="@ListUrl(category.Slug, Tag, 1)">
+                        <span class="site-side-icon"><i class="bi bi-diagram-3"></i></span>
+                        <span class="site-side-name">@category.Name</span>
+                        <span class="site-side-count">@category.ProductCount</span>
+                    </a>
+                }
+            </nav>
+
+            @if (tags.Count > 0)
+            {
+                <div class="site-side-tags">
+                    <h3>برچسب‌ها</h3>
+                    <div class="site-tag-list">
+                        <a class="site-tag @(string.IsNullOrEmpty(Tag) ? "on" : "")" href="@ListUrl(Category, null, 1)">همه</a>
+                        @foreach (var tag in tags)
+                        {
+                            <a class="site-tag @(Tag == tag.Slug ? "on" : "")" href="@ListUrl(Category, tag.Slug, 1)">@tag.Name</a>
+                        }
+                    </div>
+                </div>
+            }
+        </aside>
+
+        <section class="site-catalog-main">
+            @if (result is null)
+            {
+                <LoadingSkeleton />
+            }
+            else if (!result.Items.Any())
+            {
+                <div class="site-empty">
+                    <i class="bi bi-search"></i>
+                    <p>محصولی با این فیلتر پیدا نشد.</p>
+                    <a href="/products" class="btn btn-sm btn-outline-secondary">حذف فیلترها</a>
+                </div>
+            }
+            else
+            {
+                <div class="site-catalog-bar">
+                    <span class="site-result-count">@result.TotalCount محصول</span>
+                    @if (!string.IsNullOrEmpty(Category) || !string.IsNullOrEmpty(Tag))
+                    {
+                        <a class="site-clear" href="/products"><i class="bi bi-x-circle"></i>حذف فیلترها</a>
+                    }
+                </div>
+
+                <div class="site-grid">
+                    @foreach (var product in result.Items)
+                    {
+                        <ProductCardView Product="product" />
+                    }
+                </div>
+
+                @if (result.TotalPages > 1)
+                {
+                    <nav class="site-pager" aria-label="صفحه‌بندی">
+                        <a class="site-page-btn @(result.HasPreviousPage ? "" : "disabled")"
+                           href="@ListUrl(Category, Tag, result.Page - 1)">
+                            <i class="bi bi-chevron-right"></i> قبلی
+                        </a>
+                        <span class="site-pager-info">صفحهٔ @result.Page از @result.TotalPages</span>
+                        <a class="site-page-btn @(result.HasNextPage ? "" : "disabled")"
+                           href="@ListUrl(Category, Tag, result.Page + 1)">
+                            بعدی <i class="bi bi-chevron-left"></i>
+                        </a>
+                    </nav>
+                }
+            }
+        </section>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "category")] public string? Category { get; set; }
+    [SupplyParameterFromQuery(Name = "tag")] public string? Tag { get; set; }
+    [SupplyParameterFromQuery(Name = "page")] public int PageNumber { get; set; } = 1;
+
+    private PagedResult<ProductCardDto>? result;
+    private List<CategoryListItemDto> categories = new();
+    private List<TagListItemDto> tags = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        categories = await CategoryService.GetActiveAsync();
+        tags = await TagService.GetAllAsync();
+
+        result = await ProductService.GetPublicPagedAsync(new PublicProductFilter
+        {
+            CategorySlug = Category,
+            TagSlug = Tag,
+            Page = PageNumber < 1 ? 1 : PageNumber
+        });
+    }
+
+    private string ListUrl(string? category, string? tag, int pageNumber)
+    {
+        var query = new List<string>();
+        if (!string.IsNullOrEmpty(category)) query.Add("category=" + Uri.EscapeDataString(category));
+        if (!string.IsNullOrEmpty(tag)) query.Add("tag=" + Uri.EscapeDataString(tag));
+        if (pageNumber > 1) query.Add("page=" + pageNumber);
+        return query.Count == 0 ? "/products" : "/products?" + string.Join("&", query);
+    }
+}

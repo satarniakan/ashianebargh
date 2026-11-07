@@ -1,0 +1,28 @@
+@* کارت محصول مشترک صفحهٔ اول و فهرست محصولات. *@
+@using Ashianebargh.Application.Content
+@using Ashianebargh.Application.Helpers
+
+<a class="site-product-card" href="/product/@Product.Slug">
+    <div class="site-product-media">
+        @if (!string.IsNullOrEmpty(Product.MainImageStorageId))
+        {
+            <img src="/media/products/@Product.MainImageStorageId" alt="@Product.Name" loading="lazy" />
+        }
+        else
+        {
+            <span class="site-product-placeholder"><i class="bi bi-box-seam"></i></span>
+        }
+        <span class="site-product-cat">@Product.CategoryName</span>
+    </div>
+    <div class="site-product-bar">
+        <span class="site-product-info">
+            <span class="site-product-name" title="@Product.Name">@Product.Name</span>
+            <span class="site-product-price">@(Product.Price is null ? "برای قیمت تماس بگیرید" : CurrencyFormatter.ToToman(Product.Price.Value))</span>
+        </span>
+        <span class="site-product-arrow"><i class="bi bi-arrow-left"></i></span>
+    </div>
+</a>
+
+@code {
+    [Parameter, EditorRequired] public ProductCardDto Product { get; set; } = default!;
+}

@@ -1,0 +1,200 @@
+@page "/content/contact"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = Ashianebargh.Domain.Content.ContentPermissions.Contact)]
+@using Microsoft.AspNetCore.Authorization
+@using Ashianebargh.Application.Content
+@using Ashianebargh.Application.DTOs
+@using Ashianebargh.Domain.Content
+<PageTitle>تماس با ما</PageTitle>
+
+<div class="mb-3">
+    <h3 class="mb-1">تماس با ما</h3>
+    <div class="text-body-secondary small">
+        اطلاعات تماس نمایش‌داده‌شده در سایت و پیام‌های دریافتی از فرم تماس.
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-5">
+        <div class="card-panel">
+            <h5 class="mb-3">اطلاعات تماس</h5>
+            @if (info is null)
+            {
+                <LoadingSkeleton />
+            }
+            else
+            {
+                <EditForm Model="info" OnValidSubmit="SaveInfoAsync">
+                    <DataAnnotationsValidator />
+                    <AppTextArea Label="نشانی" @bind-Value="info.Address" Rows="2" />
+                    <div class="row">
+                        <div class="col-md-6">
+                            <AppTextField Label="تلفن ثابت" @bind-Value="info.Phone" />
+                        </div>
+                        <div class="col-md-6">
+                            <AppTextField Label="همراه" @bind-Value="info.Mobile" />
+                        </div>
+                    </div>
+                    <AppTextField Label="ایمیل" @bind-Value="info.Email" InputType="email" />
+                    <AppTextField Label="ساعات کاری" @bind-Value="info.WorkingHours"
+                                  Placeholder="مثلاً شنبه تا پنجشنبه، ۸ تا ۱۷" />
+                    <AppTextField Label="آدرس نقشه (لینک)" @bind-Value="info.MapUrl"
+                                  Hint="لینک embed نقشه یا Google Maps؛ خالی = بدون نقشه." />
+                    <div class="row">
+                        <div class="col-md-4">
+                            <AppTextField Label="اینستاگرام" @bind-Value="info.Instagram" />
+                        </div>
+                        <div class="col-md-4">
+                            <AppTextField Label="تلگرام" @bind-Value="info.Telegram" />
+                        </div>
+                        <div class="col-md-4">
+                            <AppTextField Label="واتس‌اپ" @bind-Value="info.WhatsApp" />
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary" disabled="@savingInfo">
+                        @(savingInfo ? "در حال ذخیره…" : "ذخیرهٔ اطلاعات")
+                    </button>
+                </EditForm>
+            }
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="card-panel">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">پیام‌های دریافتی</h5>
+                @if (unread > 0)
+                {
+                    <span class="badge text-bg-danger">@unread خوانده‌نشده</span>
+                }
+            </div>
+
+            @if (messages is null)
+            {
+                <LoadingSkeleton />
+            }
+            else if (!messages.Items.Any())
+            {
+                <div class="text-center text-body-secondary py-4">
+                    <i class="bi bi-envelope fs-3 d-block mb-2"></i>
+                    <span class="small">پیامی دریافت نشده است.</span>
+                </div>
+            }
+            else
+            {
+                @foreach (var message in messages.Items)
+                {
+                    <div class="border rounded p-3 mb-2 @(message.IsRead ? "" : "border-primary")">
+                        <div class="d-flex flex-wrap justify-content-between gap-2">
+                            <div>
+                                <b>@message.Name</b>
+                                <span class="text-body-secondary small ms-2" dir="ltr">@message.Phone</span>
+                                @if (!string.IsNullOrWhiteSpace(message.Subject))
+                                {
+                                    <span class="badge text-bg-light text-dark border ms-2">@message.Subject</span>
+                                }
+                                @if (!message.IsRead)
+                                {
+                                    <span class="badge text-bg-primary ms-1">جدید</span>
+                                }
+                            </div>
+                            <div class="text-body-secondary small">@message.CreatedAt.ToPersianDateTime()</div>
+                        </div>
+                        <div class="mt-2" style="white-space: pre-wrap;">@message.Message</div>
+                        <div class="d-flex gap-2 mt-2">
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleReadAsync(message)">
+                                @(message.IsRead ? "علامت‌زدن به‌عنوان خوانده‌نشده" : "خوانده شد")
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => AskDeleteAsync(message)">حذف</button>
+                        </div>
+                    </div>
+                }
+
+                <Pager CurrentPage="messages.Page" TotalPages="messages.TotalPages" TotalCount="messages.TotalCount"
+                       OnPageChanged="GoToPage" />
+            }
+        </div>
+    </div>
+</div>
+
+<AppConfirmDialog @ref="confirmDialog" />
+
+@code {
+    private ContactInfoDto? info;
+    private PagedResult<ContactMessageDto>? messages;
+    private int unread;
+    private int currentPage = 1;
+    private bool savingInfo;
+    private AppConfirmDialog confirmDialog = default!;
+
+    [Inject] private IContactService Service { get; set; } = default!;
+    [Inject] private Ashianebargh.App.Services.ToastService ToastService { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        info = await Service.GetInfoAsync();
+        await LoadMessagesAsync();
+    }
+
+    private async Task LoadMessagesAsync()
+    {
+        messages = await Service.GetMessagesAsync(currentPage);
+        unread = await Service.GetUnreadCountAsync();
+    }
+
+    private async Task GoToPage(int newPage)
+    {
+        currentPage = newPage;
+        await LoadMessagesAsync();
+    }
+
+    private async Task SaveInfoAsync()
+    {
+        savingInfo = true;
+        try
+        {
+            await Service.SaveInfoAsync(info!);
+            ToastService.ShowSuccess("اطلاعات تماس ذخیره شد.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError(ErrorMessageHelper.ToUserMessage(ex));
+        }
+        finally
+        {
+            savingInfo = false;
+        }
+    }
+
+    private async Task ToggleReadAsync(ContactMessageDto message)
+    {
+        try
+        {
+            await Service.SetReadAsync(message.Id, !message.IsRead);
+            await LoadMessagesAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError(ErrorMessageHelper.ToUserMessage(ex));
+        }
+    }
+
+    private async Task AskDeleteAsync(ContactMessageDto message)
+    {
+        var confirmed = await confirmDialog.ShowAsync(
+            "حذف پیام",
+            $"پیام «{message.Name}» حذف شود؟");
+        if (!confirmed) return;
+
+        try
+        {
+            await Service.DeleteMessageAsync(message.Id);
+            ToastService.ShowSuccess("پیام حذف شد.");
+            await LoadMessagesAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError(ErrorMessageHelper.ToUserMessage(ex));
+        }
+    }
+}

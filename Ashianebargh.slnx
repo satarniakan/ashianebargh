@@ -1,0 +1,8 @@
+<Solution>
+  <Project Path="Ashianebargh.Domain/Ashianebargh.Domain.csproj" />
+  <Project Path="Ashianebargh.Application/Ashianebargh.Application.csproj" />
+  <Project Path="Ashianebargh.Infrastructure/Ashianebargh.Infrastructure.csproj" />
+  <!-- پروژهٔ اجرایی: فقط همین یکی را اجرا کنید (در Visual Studio: Set as Startup Project) -->
+  <Project Path="Ashianebargh.App/Ashianebargh.App.csproj" />
+  <Project Path="Ashianebargh.Tests/Ashianebargh.Tests.csproj" />
+</Solution>

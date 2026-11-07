@@ -1,0 +1,96 @@
+@page "/content/categories/new"
+@page "/content/categories/{Id:int}"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = Ashianebargh.Domain.Content.ContentPermissions.Categories)]
+@using Microsoft.AspNetCore.Authorization
+@using Ashianebargh.Application.Content
+@using Ashianebargh.Domain.Content
+<PageTitle>@(Id > 0 ? "ویرایش دسته" : "دستهٔ جدید")</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">@(Id > 0 ? "ویرایش دسته" : "دستهٔ جدید")</h3>
+    <a href="/content/categories" class="btn btn-sm btn-outline-secondary">بازگشت به فهرست</a>
+</div>
+
+<div class="card-panel">
+    @if (model is null)
+    {
+        <LoadingSkeleton />
+    }
+    else
+    {
+        <EditForm Model="model" OnValidSubmit="SaveAsync">
+            <DataAnnotationsValidator />
+            <div class="row">
+                <div class="col-md-6">
+                    <AppTextField Label="نام دسته" @bind-Value="model.Name" />
+                </div>
+                <div class="col-md-6">
+                    <AppTextField Label="نامک (آدرس)" @bind-Value="model.Slug"
+                                  Hint="خالی بگذارید تا از نام ساخته شود." />
+                </div>
+            </div>
+            <AppTextArea Label="توضیح" @bind-Value="model.Description" Rows="3" ShowCount />
+            <div class="row">
+                <div class="col-md-4">
+                    <AppNumberField TValue="int" Label="ترتیب نمایش" @bind-Value="model.SortOrder" />
+                </div>
+                <div class="col-md-8 d-flex align-items-end">
+                    <AppCheckbox Label="فعال (در سایت نمایش داده شود)" @bind-Value="model.IsActive" />
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary" disabled="@saving">@(saving ? "در حال ذخیره…" : "ذخیره")</button>
+                <a href="/content/categories" class="btn btn-outline-secondary">انصراف</a>
+            </div>
+        </EditForm>
+    }
+</div>
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private CategoryEditDto? model;
+    private bool saving;
+
+    [Inject] private ICategoryService Service { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private Ashianebargh.App.Services.ToastService ToastService { get; set; } = default!;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Id > 0)
+        {
+            model = await Service.GetAsync(Id);
+            if (model is null)
+            {
+                ToastService.ShowError("دسته یافت نشد.");
+                Navigation.NavigateTo("/content/categories");
+            }
+        }
+        else
+        {
+            model = new CategoryEditDto();
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        saving = true;
+        try
+        {
+            await Service.SaveAsync(model!);
+            ToastService.ShowSuccess("دسته ذخیره شد.");
+            Navigation.NavigateTo("/content/categories");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError(ErrorMessageHelper.ToUserMessage(ex));
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+}

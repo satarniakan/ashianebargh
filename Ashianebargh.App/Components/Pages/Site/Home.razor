@@ -1,0 +1,119 @@
+@page "/"
+@layout SiteLayout
+@using Ashianebargh.Application.Content
+@inject IProductService ProductService
+@inject ICategoryService CategoryService
+<PageTitle>آشیانه برق | معرفی محصولات</PageTitle>
+
+<section class="site-hero">
+    <div class="site-container site-hero-inner">
+        <div class="site-hero-text">
+            <div class="site-eyebrow">تأمین تخصصی تجهیزات برق</div>
+            <h1>آشیانه <span>برق</span></h1>
+            <p class="site-hero-lead">
+                معرفی و عرضهٔ محصولات برقی و روشنایی؛ همراه با راهنمایی برای انتخاب درست،
+                پشتیبانی فنی و ارسال به سراسر کشور.
+            </p>
+            <div class="site-hero-actions">
+                <a class="site-btn site-btn--red" href="/products">
+                    <i class="bi bi-arrow-left"></i>
+                    مشاهدهٔ محصولات
+                </a>
+                <a class="site-btn site-btn--ghost" href="/contact">
+                    <i class="bi bi-headset"></i>
+                    تماس با ما
+                </a>
+            </div>
+        </div>
+
+        <div class="site-hero-art" aria-hidden="true">
+            <span class="site-hero-ring site-hero-ring--outer"></span>
+            <span class="site-hero-ring site-hero-ring--inner"></span>
+            <i class="bi bi-lightning-charge-fill"></i>
+        </div>
+    </div>
+</section>
+
+<section class="site-feats">
+    <div class="site-container">
+        <ul>
+            <li>
+                <span class="site-feat-icon"><i class="bi bi-boxes"></i></span>
+                <span>تنوع محصولات<small>برقی و روشنایی</small></span>
+            </li>
+            <li>
+                <span class="site-feat-icon"><i class="bi bi-person-gear"></i></span>
+                <span>مشاورهٔ فنی<small>برای انتخاب درست</small></span>
+            </li>
+            <li>
+                <span class="site-feat-icon"><i class="bi bi-truck"></i></span>
+                <span>ارسال سراسری<small>به همهٔ شهرها</small></span>
+            </li>
+            <li>
+                <span class="site-feat-icon"><i class="bi bi-shield-check"></i></span>
+                <span>پشتیبانی<small>پس از فروش</small></span>
+            </li>
+        </ul>
+    </div>
+</section>
+
+<div class="site-container">
+    @if (categories.Count > 0)
+    {
+        <section class="site-section">
+            <div class="site-section-head">
+                <div class="site-section-title"><h2>دسته‌بندی محصولات</h2></div>
+                <a class="site-more" href="/products">همهٔ محصولات <i class="bi bi-arrow-left"></i></a>
+            </div>
+
+            <div class="site-cats">
+                @foreach (var category in categories)
+                {
+                    <a class="site-cat" href="/products?category=@category.Slug">
+                        <span class="site-cat-icon"><i class="bi bi-diagram-3"></i></span>
+                        <span class="site-cat-name">@category.Name</span>
+                        <span class="site-cat-meta">
+                            <span>@category.ProductCount محصول</span>
+                            <span class="site-arrow"><i class="bi bi-arrow-left"></i></span>
+                        </span>
+                    </a>
+                }
+            </div>
+        </section>
+    }
+
+    <section class="site-section">
+        <div class="site-section-head">
+            <div class="site-section-title"><h2>محصولات ویژه</h2></div>
+            <a class="site-more" href="/products">همهٔ محصولات <i class="bi bi-arrow-left"></i></a>
+        </div>
+
+        @if (featured.Count == 0)
+        {
+            <div class="site-empty">
+                <i class="bi bi-box-seam"></i>
+                <p>هنوز محصول ویژه‌ای ثبت نشده است.</p>
+            </div>
+        }
+        else
+        {
+            <div class="site-grid site-grid--4">
+                @foreach (var product in featured)
+                {
+                    <ProductCardView Product="product" />
+                }
+            </div>
+        }
+    </section>
+</div>
+
+@code {
+    private List<ProductCardDto> featured = new();
+    private List<CategoryListItemDto> categories = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        featured = await ProductService.GetFeaturedAsync(8);
+        categories = await CategoryService.GetActiveAsync();
+    }
+}

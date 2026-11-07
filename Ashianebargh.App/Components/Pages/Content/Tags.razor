@@ -1,0 +1,93 @@
+@page "/content/tags"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = Ashianebargh.Domain.Content.ContentPermissions.Tags)]
+@using Microsoft.AspNetCore.Authorization
+@using Ashianebargh.Application.Content
+@using Ashianebargh.Domain.Content
+<PageTitle>برچسب‌ها</PageTitle>
+
+<div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
+    <div>
+        <h3 class="mb-1">برچسب‌ها</h3>
+        <div class="text-body-secondary small">برچسب‌ها برای دسته‌بندی موضوعی محصولات (مثلاً «کابل»، «روشنایی»)</div>
+    </div>
+    <a href="/content/tags/new" class="btn btn-primary btn-sm">برچسب جدید</a>
+</div>
+
+<div class="card-panel">
+    @if (items is null)
+    {
+        <LoadingSkeleton />
+    }
+    else if (items.Count == 0)
+    {
+        <div class="text-center text-body-secondary py-4">
+            <i class="bi bi-tags fs-3 d-block mb-2"></i>
+            <span class="small">هنوز برچسبی ثبت نشده است.</span>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table mb-0">
+                <thead>
+                    <tr>
+                        <th>نام</th>
+                        <th>نامک</th>
+                        <th>تعداد محصول</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in items)
+                    {
+                        <tr>
+                            <td>@item.Name</td>
+                            <td dir="ltr" class="text-end">@item.Slug</td>
+                            <td>@item.ProductCount</td>
+                            <td class="text-end">
+                                <div class="d-inline-flex gap-1">
+                                    <a href="/content/tags/@item.Id" class="btn btn-sm btn-outline-primary">ویرایش</a>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => AskDelete(item)">حذف</button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<AppConfirmDialog @ref="confirmDialog" />
+
+@code {
+    private List<TagListItemDto>? items;
+    private AppConfirmDialog confirmDialog = default!;
+
+    [Inject] private ITagService Service { get; set; } = default!;
+    [Inject] private Ashianebargh.App.Services.ToastService ToastService { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync() => items = await Service.GetAllAsync();
+
+    private async Task AskDelete(TagListItemDto item)
+    {
+        var confirmed = await confirmDialog.ShowAsync(
+            "حذف برچسب",
+            $"برچسب «{item.Name}» حذف شود؟ از محصولات مرتبط هم برداشته می‌شود.");
+        if (!confirmed) return;
+
+        try
+        {
+            await Service.DeleteAsync(item.Id);
+            ToastService.ShowSuccess("برچسب حذف شد.");
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError(ErrorMessageHelper.ToUserMessage(ex));
+        }
+    }
+}

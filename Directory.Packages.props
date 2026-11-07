@@ -1,0 +1,60 @@
+<Project>
+
+  <!-- مدیریت متمرکز نسخهٔ بسته‌ها. دیگر هیچ csproj نسخه‌ی خودش را نمی‌نویسد؛
+       همهٔ بسته‌های یک خانواده (EF Core، Identity، Extensions) هم‌نسخه می‌مانند. -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <!-- حسابرسی آسیب‌پذیری‌ها در هر restore (هشدار NU190x). چون TreatWarningsAsErrors
+         خاموش است، بیلد را قرمز نمی‌کند ولی در خروجی build/CI دیده می‌شود. -->
+    <NuGetAuditMode>all</NuGetAuditMode>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- ایمیل (جایگزین SmtpClient قدیمی) -->
+    <PackageVersion Include="MailKit" Version="4.18.1" />
+
+    <!-- خروجی اکسل/PDF -->
+    <PackageVersion Include="ClosedXML" Version="0.104.2" />
+    <PackageVersion Include="QuestPDF" Version="2026.9.1" />
+
+    <!-- Identity / EF Core — همه روی یک نسخه‌ی وصله -->
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Identity.Stores" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.0.13" />
+
+    <!-- میزبان نمونه -->
+    <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />
+
+    <!-- مستندات خودکار API موبایل -->
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
+
+    <!-- اعلان وب‌پوش -->
+    <PackageVersion Include="WebPush" Version="1.0.13" />
+
+    <!-- کش توزیع‌شده (اختیاری، جایگزین InMemory Cache در Production) -->
+    <PackageVersion Include="StackExchange.Redis" Version="2.8.24" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.13" />
+
+    <!-- Health Checks UI (داشبورد بصری برای /health) -->
+    <PackageVersion Include="AspNetCore.HealthChecks.UI" Version="9.0.0" />
+    <PackageVersion Include="AspNetCore.HealthChecks.UI.InMemory.Storage" Version="9.0.0" />
+    <!-- Feature Flags -->
+    <PackageVersion Include="Microsoft.FeatureManagement.AspNetCore" Version="4.0.0" />
+    <!-- Background Jobs (Quartz.NET) -->
+    <PackageVersion Include="Quartz" Version="3.13.1" />
+    <PackageVersion Include="Quartz.Extensions.Hosting" Version="3.13.1" />
+    <!-- Telegram Bot -->
+    <PackageVersion Include="Telegram.Bot" Version="22.0.0" />
+    <PackageVersion Include="coverlet.collector" Version="6.0.4" />
+    <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageVersion Include="Moq" Version="4.20.72" />
+    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+</Project>

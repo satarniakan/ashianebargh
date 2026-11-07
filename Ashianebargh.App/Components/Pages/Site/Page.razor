@@ -1,0 +1,54 @@
+@page "/{Slug}"
+@layout SiteLayout
+@using Ashianebargh.Application.Content
+@inject IPageService PageService
+
+@if (view is null)
+{
+    <PageTitle>صفحه یافت نشد | آشیانه برق</PageTitle>
+    <div class="site-container">
+        <div class="site-empty">
+            <i class="bi bi-compass"></i>
+            <p>صفحه‌ای با این آدرس وجود ندارد یا منتشر نشده است.</p>
+            <a href="/" class="btn btn-sm btn-outline-secondary">بازگشت به صفحهٔ اول</a>
+        </div>
+    </div>
+}
+else
+{
+    <PageTitle>@view.Title | آشیانه برق</PageTitle>
+
+    <div class="site-container">
+        <div class="site-page-head">
+            <nav class="site-breadcrumb" aria-label="مسیر">
+                <a href="/">خانه</a>
+                <span class="sep">/</span>
+                <span class="current">@view.Title</span>
+            </nav>
+            <h1>@view.Title</h1>
+        </div>
+
+        @if (string.IsNullOrWhiteSpace(view.Content))
+        {
+            <div class="site-empty">
+                <i class="bi bi-file-earmark-text"></i>
+                <p>متنی برای این صفحه ثبت نشده است.</p>
+            </div>
+        }
+        else
+        {
+            <div class="content-panel">
+                <ContentParagraphs Text="@view.Content" />
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public string Slug { get; set; } = string.Empty;
+
+    private PageViewDto? view;
+
+    protected override async Task OnParametersSetAsync()
+        => view = await PageService.GetPublishedBySlugAsync(Slug);
+}

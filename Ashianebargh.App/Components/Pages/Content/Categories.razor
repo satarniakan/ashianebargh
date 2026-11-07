@@ -1,0 +1,106 @@
+@page "/content/categories"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = Ashianebargh.Domain.Content.ContentPermissions.Categories)]
+@using Microsoft.AspNetCore.Authorization
+@using Ashianebargh.Application.Content
+@using Ashianebargh.Domain.Content
+<PageTitle>دسته‌بندی‌ها</PageTitle>
+
+<div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
+    <div>
+        <h3 class="mb-1">دسته‌بندی محصولات</h3>
+        <div class="text-body-secondary small">گروه‌بندی محصولات سایت؛ ترتیب نمایش با فیلد «ترتیب»</div>
+    </div>
+    <a href="/content/categories/new" class="btn btn-primary btn-sm">دستهٔ جدید</a>
+</div>
+
+<div class="card-panel">
+    @if (items is null)
+    {
+        <LoadingSkeleton />
+    }
+    else if (items.Count == 0)
+    {
+        <div class="text-center text-body-secondary py-4">
+            <i class="bi bi-diagram-3 fs-3 d-block mb-2"></i>
+            <span class="small">هنوز دسته‌ای ثبت نشده است.</span>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table mb-0">
+                <thead>
+                    <tr>
+                        <th>نام</th>
+                        <th>نامک</th>
+                        <th>تعداد محصول</th>
+                        <th>ترتیب</th>
+                        <th>وضعیت</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in items)
+                    {
+                        <tr>
+                            <td>@item.Name</td>
+                            <td dir="ltr" class="text-end">@item.Slug</td>
+                            <td>@item.ProductCount</td>
+                            <td>@item.SortOrder</td>
+                            <td>
+                                @if (item.IsActive)
+                                {
+                                    <span class="badge text-bg-success">فعال</span>
+                                }
+                                else
+                                {
+                                    <span class="badge text-bg-secondary">غیرفعال</span>
+                                }
+                            </td>
+                            <td class="text-end">
+                                <div class="d-inline-flex gap-1">
+                                    <a href="/content/categories/@item.Id" class="btn btn-sm btn-outline-primary">ویرایش</a>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => AskDelete(item)">حذف</button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<AppConfirmDialog @ref="confirmDialog" />
+
+@code {
+    private List<CategoryListItemDto>? items;
+    private AppConfirmDialog confirmDialog = default!;
+
+    [Inject] private ICategoryService Service { get; set; } = default!;
+    [Inject] private Ashianebargh.App.Services.ToastService ToastService { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync() => items = await Service.GetAllAsync();
+
+    private async Task AskDelete(CategoryListItemDto item)
+    {
+        var confirmed = await confirmDialog.ShowAsync(
+            "حذف دسته",
+            $"دستهٔ «{item.Name}» حذف شود؟ دسته‌ای که محصول دارد حذف نمی‌شود.");
+        if (!confirmed) return;
+
+        try
+        {
+            await Service.DeleteAsync(item.Id);
+            ToastService.ShowSuccess("دسته حذف شد.");
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError(ErrorMessageHelper.ToUserMessage(ex));
+        }
+    }
+}
