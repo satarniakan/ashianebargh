@@ -9,6 +9,7 @@ public enum ProfileUpdateStatus
     Success,
     UserNotFound,
     FullNameTooLong,
+    ProfileUpdateFailed,
     EmailAlreadyExists,
     EmailUpdateFailed,
     PasswordAlreadySet,

@@ -26,7 +26,7 @@ public sealed class CategoryEditDto
 
 public sealed record CategoryListItemDto(
     int Id, string Name, string Slug, string? Description,
-    bool IsActive, int SortOrder, int ProductCount);
+    bool IsActive, int SortOrder, int ProductCount, string? ImageStorageId);
 
 // ---------- برچسب ----------
 

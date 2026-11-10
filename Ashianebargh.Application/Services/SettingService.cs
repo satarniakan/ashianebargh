@@ -98,7 +98,7 @@ public class SettingService : ISettingService
     public async Task<string> GetEffectiveAsync(string key, string? configurationKey = null,
         string defaultValue = "")
     {
-        // این مسیر داغ است (هر SMS/پرداخت/کپچا/توکن از اینجا می‌گذرد) پس ردیف دیتابیس
+        // این مسیر داغ است (هر SMS/کپچا/توکن از اینجا می‌گذرد) پس ردیف دیتابیس
         // کش می‌شود؛ SetAsync/ClearAsync همان کش را باطل می‌کنند. خواندن appsettings
         // (IConfiguration درون‌حافظه‌ای) ارزان است و کش نمی‌خواهد — پس ترکیب نهایی
         // همیشه تازه است و مشکل «باطل‌کردن همهٔ ترکیب‌ها» هم پیش نمی‌آید.

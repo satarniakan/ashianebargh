@@ -47,4 +47,11 @@ public interface IOutboxRepository
 
     /// <summary>تعداد پیام‌ها در یک وضعیت — برای داشبورد.</summary>
     Task<int> CountAsync(OutboxStatus status);
+
+    /// <summary>
+    /// حذف پیام‌های ارسال‌شدهٔ قدیمی‌تر از cutoff. پیام‌های Failed عمداً می‌مانند تا
+    /// ادمین بتواند بررسی/تلاش دوباره کند؛ این جدول در غیر این صورت بی‌نهایت رشد می‌کند.
+    /// بازگشت: تعداد حذف‌شده.
+    /// </summary>
+    Task<int> DeleteSentOlderThanAsync(DateTime cutoffUtc);
 }

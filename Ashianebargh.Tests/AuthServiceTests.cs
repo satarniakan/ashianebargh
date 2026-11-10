@@ -6,6 +6,7 @@ using Moq;
 using Ashianebargh.Application.DTOs;
 using Ashianebargh.Application.Services;
 using Ashianebargh.Domain.Identity;
+using Ashianebargh.Domain.Interfaces;
 
 namespace Ashianebargh.Tests;
 
@@ -19,6 +20,7 @@ public class AuthServiceTests
         public Mock<UserManager<ApplicationUser>> Users { get; } = CreateUserManager();
         public Mock<IOtpService> Otp { get; } = new();
         public Mock<IApiTokenService> Tokens { get; } = new();
+        public Mock<IAshianebarghUnitOfWork> UnitOfWork { get; } = CreateUnitOfWork();
 
         public AuthService Build()
         {
@@ -36,8 +38,18 @@ public class AuthServiceTests
                 Mock.Of<ILoginHistoryService>(),
                 Mock.Of<IHttpContextAccessor>(),
                 Tokens.Object,
+                UnitOfWork.Object,
                 new ConfigurationBuilder().Build(),
                 NullLogger<AuthService>.Instance);
+        }
+
+        private static Mock<IAshianebarghUnitOfWork> CreateUnitOfWork()
+        {
+            var uow = new Mock<IAshianebarghUnitOfWork>();
+            // تراکنش در تست همان اجرای مستقیم عملیات است
+            uow.Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>()))
+                .Returns<Func<Task>>(action => action());
+            return uow;
         }
 
         private static Mock<UserManager<ApplicationUser>> CreateUserManager()

@@ -56,14 +56,14 @@
         @if (stats?.TotalUsers is not null)
         {
             <div class="row g-3 mt-1">
-                <div class="col-md-4">
+                <div class="col-md-6">
                     <a href="admin/users" class="card-panel d-block text-decoration-none">
                         <i class="bi bi-people fs-4"></i>
                         <div class="fw-semibold mt-2">@stats.TotalUsers کاربر</div>
                         <div class="text-body-secondary small">مدیریت کاربران و نقش‌ها</div>
                     </a>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-6">
                     <a href="admin/outbox" class="card-panel d-block text-decoration-none">
                         <i class="bi bi-send fs-4"></i>
                         <div class="fw-semibold mt-2">
@@ -74,13 +74,6 @@
                             }
                         </div>
                         <div class="text-body-secondary small">نظارت و تلاش دوباره</div>
-                    </a>
-                </div>
-                <div class="col-md-4">
-                    <a href="admin/payments" class="card-panel d-block text-decoration-none">
-                        <i class="bi bi-credit-card fs-4"></i>
-                        <div class="fw-semibold mt-2">پرداخت‌ها</div>
-                        <div class="text-body-secondary small">مشاهدهٔ وضعیت پرداخت‌ها</div>
                     </a>
                 </div>
             </div>

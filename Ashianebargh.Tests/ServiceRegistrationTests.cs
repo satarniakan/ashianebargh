@@ -90,4 +90,67 @@ public class ServiceRegistrationTests
 
         Assert.IsType<KavenegarSmsSender>(scope.ServiceProvider.GetRequiredService<ISmsSender>());
     }
+
+    /// <summary>کانفیگ Production با همهٔ مقادیر اجباری پر؛ هر تست یک کلید را خالی می‌کند.</summary>
+    private static Dictionary<string, string?> ProductionSettings() => new()
+    {
+        ["ConnectionStrings:Default"] = DummyConnection,
+        ["Captcha:Provider"] = "Turnstile",
+        ["Captcha:Turnstile:SiteKey"] = "site-key",
+        ["Captcha:Turnstile:SecretKey"] = "secret-key",
+        ["Security:Pepper"] = "pepper",
+    };
+
+    private static void RegisterProduction(Dictionary<string, string?> settings)
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton<IConfiguration>(configuration);
+        services.AddAshianebarghApplication();
+        services.AddAshianebarghInfrastructure(configuration, isDevelopment: false);
+    }
+
+    [Fact]
+    public void Production_Throws_WhenCaptchaProviderNotTurnstile()
+    {
+        var settings = ProductionSettings();
+        settings["Captcha:Provider"] = "";
+
+        Assert.Throws<InvalidOperationException>(() => RegisterProduction(settings));
+    }
+
+    [Fact]
+    public void Production_Throws_WhenTurnstileSecretMissing()
+    {
+        var settings = ProductionSettings();
+        settings["Captcha:Turnstile:SecretKey"] = "";
+
+        Assert.Throws<InvalidOperationException>(() => RegisterProduction(settings));
+    }
+
+    [Fact]
+    public void Production_Throws_WhenTurnstileSiteKeyMissing()
+    {
+        var settings = ProductionSettings();
+        settings["Captcha:Turnstile:SiteKey"] = "";
+
+        Assert.Throws<InvalidOperationException>(() => RegisterProduction(settings));
+    }
+
+    [Fact]
+    public void Production_Throws_WhenPepperMissing()
+    {
+        var settings = ProductionSettings();
+        settings["Security:Pepper"] = "";
+
+        Assert.Throws<InvalidOperationException>(() => RegisterProduction(settings));
+    }
+
+    [Fact]
+    public void Production_Registers_WhenAllRequiredSecretsPresent()
+    {
+        // بدون پرتاب استثنا یعنی گاردها با کانفیگ کاملِ Production اجازهٔ استقرار می‌دهند
+        RegisterProduction(ProductionSettings());
+    }
 }

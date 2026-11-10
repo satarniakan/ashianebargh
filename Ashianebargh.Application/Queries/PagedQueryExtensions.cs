@@ -36,8 +36,11 @@ public static class PagedQueryExtensions
         // شمارش باید پیش از بریدن انجام شود، وگرنه صفحه‌بندی و «n از m» اشتباه می‌شود
         var totalCount = await query.CountAsync(cancellationToken);
 
+        // ضرب int با page بسیار بزرگ سرریز می‌شد و Skip منفی می‌ساخت
+        var skip = Math.Min((long)(page - 1) * pageSize, int.MaxValue);
+
         var items = await query
-            .Skip((page - 1) * pageSize)
+            .Skip((int)skip)
             .Take(pageSize)
             .ToListAsync(cancellationToken);
 

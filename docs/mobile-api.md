@@ -74,17 +74,6 @@ curl -X DELETE http://localhost:5000/api/v1/auth/tokens -H "Authorization: Beare
 # 200 {"revoked":2}
 ```
 
-## پرداخت (موبایل)
-
-```bash
-# شروع پرداخت (مبلغ به تومان) → آدرس درگاه در مرورگر باز شود
-curl -X POST http://localhost:5000/api/v1/payments \
-  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"amountTomans":50000,"description":"..."}'
-# 200 {"paymentId":12,"paymentUrl":"https://www.zarinpal.com/pg/StartPay/..."}
-# برگشت درگاه به /payments/callback می‌آید و به /payment-result هدایت می‌شود
-```
-
 ## اعلان‌ها
 
 ```bash

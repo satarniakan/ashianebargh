@@ -19,7 +19,12 @@ public sealed class CategoryService(IContentUnitOfWork uow) : ICategoryService
         uow.Content.Categories
             .OrderBy(c => c.SortOrder).ThenBy(c => c.Name)
             .Select(c => new CategoryListItemDto(
-                c.Id, c.Name, c.Slug, c.Description, c.IsActive, c.SortOrder, c.Products.Count))
+                c.Id, c.Name, c.Slug, c.Description, c.IsActive, c.SortOrder, c.Products.Count,
+                c.Products
+                    .Where(p => p.IsActive && p.MainImageStorageId != null)
+                    .OrderBy(p => p.SortOrder).ThenBy(p => p.Id)
+                    .Select(p => p.MainImageStorageId)
+                    .FirstOrDefault()))
             .ToListAsync();
 
     public Task<List<CategoryListItemDto>> GetActiveAsync() =>
@@ -27,7 +32,12 @@ public sealed class CategoryService(IContentUnitOfWork uow) : ICategoryService
             .Where(c => c.IsActive)
             .OrderBy(c => c.SortOrder).ThenBy(c => c.Name)
             .Select(c => new CategoryListItemDto(
-                c.Id, c.Name, c.Slug, c.Description, c.IsActive, c.SortOrder, c.Products.Count))
+                c.Id, c.Name, c.Slug, c.Description, c.IsActive, c.SortOrder, c.Products.Count,
+                c.Products
+                    .Where(p => p.IsActive && p.MainImageStorageId != null)
+                    .OrderBy(p => p.SortOrder).ThenBy(p => p.Id)
+                    .Select(p => p.MainImageStorageId)
+                    .FirstOrDefault()))
             .ToListAsync();
 
     public Task<CategoryEditDto?> GetAsync(int id) =>

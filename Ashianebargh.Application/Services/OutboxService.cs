@@ -1,4 +1,5 @@
 using Ashianebargh.Application.DTOs;
+using Ashianebargh.Application.Helpers;
 using Ashianebargh.Application.Queries;
 using Ashianebargh.Domain.Entities;
 using Ashianebargh.Domain.Enums;
@@ -87,7 +88,8 @@ public class OutboxService : IOutboxService
             Recipient = recipient,
             Subject = subject,
             Body = body,
-            LinkUrl = linkUrl
+            // لینک پوش هم در مرورگر باز می‌شود؛ همان اعتبارسنجی اعلان درون‌برنامه‌ای
+            LinkUrl = SafeUrl.Normalize(linkUrl)
         });
         await _unitOfWork.CompleteAsync();
     }

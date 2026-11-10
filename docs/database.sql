@@ -146,22 +146,6 @@ CREATE TABLE [OutboxMessages] (
     CONSTRAINT [PK_OutboxMessages] PRIMARY KEY ([Id])
 );
 
-CREATE TABLE [Payments] (
-    [Id] int NOT NULL IDENTITY,
-    [UserId] nvarchar(450) NOT NULL,
-    [AmountTomans] bigint NOT NULL,
-    [Description] nvarchar(500) NOT NULL,
-    [Gateway] nvarchar(32) NOT NULL,
-    [Authority] nvarchar(64) NOT NULL,
-    [Status] int NOT NULL,
-    [RefId] bigint NULL,
-    [CardPanMasked] nvarchar(32) NULL,
-    [FailureReason] nvarchar(500) NULL,
-    [CreatedAtUtc] datetime2 NOT NULL,
-    [PaidAtUtc] datetime2 NULL,
-    CONSTRAINT [PK_Payments] PRIMARY KEY ([Id])
-);
-
 CREATE TABLE [PushSubscriptions] (
     [Id] int NOT NULL IDENTITY,
     [UserId] nvarchar(450) NOT NULL,
@@ -254,10 +238,6 @@ CREATE INDEX [IX_OtpCodes_PhoneNumber] ON [OtpCodes] ([PhoneNumber]);
 CREATE INDEX [IX_OutboxMessages_Status] ON [OutboxMessages] ([Status]);
 
 CREATE INDEX [IX_OutboxMessages_Status_Attempts] ON [OutboxMessages] ([Status], [Attempts]);
-
-CREATE UNIQUE INDEX [IX_Payments_Authority] ON [Payments] ([Authority]);
-
-CREATE INDEX [IX_Payments_UserId_Status] ON [Payments] ([UserId], [Status]);
 
 CREATE UNIQUE INDEX [IX_PushSubscriptions_Endpoint] ON [PushSubscriptions] ([Endpoint]);
 

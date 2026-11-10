@@ -12,7 +12,6 @@ public interface IAshianebarghUnitOfWork
     IAuditLogRepository AuditLogs { get; }
     INotificationRepository Notifications { get; }
     IOutboxRepository Outbox { get; }
-    IPaymentRepository Payments { get; }
 
     /// <summary>تغییرات track‌شده را commit می‌کند و تعداد ردیف‌های تغییریافته را برمی‌گرداند.</summary>
     Task<int> CompleteAsync();

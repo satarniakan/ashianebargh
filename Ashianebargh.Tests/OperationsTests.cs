@@ -17,7 +17,7 @@ using Ashianebargh.Infrastructure.Repositories;
 namespace Ashianebargh.Tests;
 
 /// <summary>
-/// موارد جدید: داشبورد، صفحه‌بندی/تلاش‌مجدد صف، فهرست پرداخت‌ها، ایمپورت کاربران.
+/// موارد جدید: داشبورد، صفحه‌بندی/تلاش‌مجدد صف، ایمپورت کاربران.
 /// </summary>
 public class OperationsTests
 {
@@ -103,25 +103,6 @@ public class OperationsTests
         var service = new OutboxService(uow.Object, NullLogger<OutboxService>.Instance);
 
         Assert.True(await service.RetryAsync(7));
-    }
-
-    // ---------- پرداخت‌ها ----------
-
-    [Fact]
-    public async Task PaymentService_GetPaged_DelegatesWithClamp()
-    {
-        var uow = new Mock<IAshianebarghUnitOfWork>();
-        var repo = new Mock<IPaymentRepository>();
-        uow.Setup(u => u.Payments).Returns(repo.Object);
-        var payments = new List<Payment> { new() { Id = 1, Status = PaymentStatus.Paid } };
-        repo.Setup(r => r.GetPagedAsync(PaymentStatus.Paid, 1, 20))
-            .ReturnsAsync((payments, 1));
-
-        var service = new PaymentService(Mock.Of<IPaymentGateway>(), uow.Object);
-        var result = await service.GetPagedAsync(PaymentStatus.Paid, 1, 20);
-
-        Assert.Single(result.Items);
-        Assert.Equal(1, result.TotalCount);
     }
 
     // ---------- ایمپورت کاربران ----------

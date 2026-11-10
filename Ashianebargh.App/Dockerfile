@@ -13,5 +13,13 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 EXPOSE 8080
 ENV ASPNETCORE_URLS=http://+:8080
-COPY --from=build /app/publish .
+
+# اجرا با کاربر غیرریشه (app) — ایمیج‌های رسمی .NET متغیر APP_UID را دارند.
+# پوشه‌های نوشتنی (لاگ، کلیدهای DataProtection، فایل‌های بارگذاری‌شده) باید
+# پیش از تغییر کاربر مالک داشته باشند، وگرنه اپ در Production خطای دسترسی می‌دهد.
+RUN mkdir -p /app/Logs /app/DataProtection-Keys /app/AppData \
+    && chown -R $APP_UID:$APP_UID /app
+
+COPY --from=build --chown=$APP_UID:$APP_UID /app/publish .
+USER $APP_UID
 ENTRYPOINT ["dotnet", "Ashianebargh.App.dll"]

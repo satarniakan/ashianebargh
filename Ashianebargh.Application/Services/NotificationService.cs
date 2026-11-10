@@ -1,4 +1,5 @@
 using Ashianebargh.Application.DTOs;
+using Ashianebargh.Application.Helpers;
 using Ashianebargh.Domain.Entities;
 using Ashianebargh.Domain.Enums;
 using Ashianebargh.Domain.Interfaces;
@@ -54,7 +55,7 @@ public class NotificationService : INotificationService
             Title = title,
             Body = body,
             Type = type,
-            LinkUrl = linkUrl
+            LinkUrl = SafeUrl.Normalize(linkUrl)
         });
         await _unitOfWork.CompleteAsync();
     }
@@ -98,7 +99,7 @@ public class NotificationService : INotificationService
                 Title = title,
                 Body = body,
                 Type = type,
-                LinkUrl = linkUrl
+                LinkUrl = SafeUrl.Normalize(linkUrl)
             });
         }
         await _unitOfWork.CompleteAsync();
@@ -122,7 +123,7 @@ public class NotificationService : INotificationService
                 Title = title,
                 Body = body,
                 Type = type,
-                LinkUrl = linkUrl
+                LinkUrl = SafeUrl.Normalize(linkUrl)
             });
         }
 
@@ -132,7 +133,8 @@ public class NotificationService : INotificationService
 
     private static NotificationDto ToDto(Notification n)
     {
-        var dto = new NotificationDto(n.Id, n.Title, n.Body, n.Type, n.LinkUrl, n.CreatedAt)
+        // رکوردهای قدیمی پیش از اعتبارسنجی ذخیره شده‌اند؛ اینجا هم پاک می‌شوند
+        var dto = new NotificationDto(n.Id, n.Title, n.Body, n.Type, SafeUrl.Normalize(n.LinkUrl), n.CreatedAt)
         {
             IsRead = n.IsRead
         };

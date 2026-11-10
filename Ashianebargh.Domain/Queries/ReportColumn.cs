@@ -44,15 +44,33 @@ public sealed record ReportQueryOptions
     /// <summary>تعداد ردیف در هر صفحه (فقط برای نمایش).</summary>
     public int PageSize { get; init; } = 500;
 
-    /// <summary>گزینه‌های پیش‌فرض: نمایشِ صفحه‌بندی‌شده با ۵۰۰ ردیف در هر صفحه.</summary>
-    public static ReportQueryOptions ForPage(int page, int pageSize = 500) => new()
-    {
-        Skip = Math.Max(0, page - 1) * Math.Max(1, pageSize),
-        Take = Math.Max(1, pageSize)
-    };
+    /// <summary>
+    /// سقف ردیف خروجی. گزارشِ بی‌فیلتر می‌توانست کل جدول را به حافظه بکشد و
+    /// فرایند را با OutOfMemory از پا دربیاورد؛ سقف، خرابی را به «فایل ناقص با
+    /// علامت Truncated» تبدیل می‌کند.
+    /// </summary>
+    public const int MaxExportRows = 50_000;
 
-    /// <summary>گزینه‌های خروجی: بدون سقف و بدون رد کردن — همهٔ رکوردهای فیلترشده.</summary>
-    public static ReportQueryOptions ForExport() => new() { Take = null, Skip = 0 };
+    /// <summary>گزینه‌های پیش‌فرض: نمایشِ صفحه‌بندی‌شده با ۵۰۰ ردیف در هر صفحه.</summary>
+    public static ReportQueryOptions ForPage(int page, int pageSize = 500)
+    {
+        var size = Math.Max(1, pageSize);
+        // Skip را در long حساب می‌کنیم: page=int.MaxValue با صفحه‌بندی int سرریز
+        // می‌شد و Offset منفی به دیتابیس می‌رفت.
+        var skip = Math.Min((long)Math.Max(0, page - 1) * size, int.MaxValue);
+
+        return new ReportQueryOptions
+        {
+            Skip = (int)skip,
+            Take = size,
+            PageSize = size
+        };
+    }
+
+    /// <summary>
+    /// گزینه‌های خروجی: همهٔ رکوردهای فیلترشده تا سقف <see cref="MaxExportRows"/>.
+    /// </summary>
+    public static ReportQueryOptions ForExport() => new() { Take = MaxExportRows, Skip = 0 };
 }
 
 /// <summary>نتیجهٔ یک گزارش: سرستون‌ها + سطرها</summary>

@@ -1,7 +1,7 @@
 // دانلود فایل خروجی گزارش‌ها (اکسل و PDF).
 // فایل به‌صورت DotNetStreamReference می‌آید (نه base64) تا فایل‌های بزرگ
 // حافظهٔ دوبرابر مصرف نکنند.
-function downloadReportFile(fileName, contentReference, mimeType) {
+async function downloadReportFile(fileName, contentReference, mimeType) {
     const arrayBuffer = new Uint8Array(await contentReference.arrayBuffer());
     const blob = new Blob([arrayBuffer], { type: mimeType });
     const url = URL.createObjectURL(blob);

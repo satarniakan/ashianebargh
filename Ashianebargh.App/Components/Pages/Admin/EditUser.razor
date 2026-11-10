@@ -77,7 +77,9 @@ else
     private bool isSaving;
     private string? errorMessage;
 
-    protected override async Task OnInitializedAsync()
+    // پارامتر مسیر هنگام OnInitializedAsync هنوز مقدار ندارد در ناوبری سمت کلاینت؛
+    // بارگذاری باید در OnParametersSetAsync باشد وگرنه شناسه خالی خوانده می‌شود.
+    protected override async Task OnParametersSetAsync()
     {
         var user = await UserAdminService.GetUserAsync(UserId);
         if (user is null)

@@ -4,26 +4,70 @@
 
 services:
   sqlserver:
-    # پورت دیتابیس به بیرون باز نمی‌شود؛ فقط اپ داخل شبکهٔ compose می‌بیندش
-    ports: []
+    # پورت دیتابیس به بیرون باز نمی‌شود؛ فقط اپ داخل شبکهٔ compose می‌بیندش.
+    # !reset لازم است چون ports در ادغام compose الحاق می‌شود و [] خالی آن را نمی‌بندد.
+    ports: !reset []
     restart: unless-stopped
     environment:
       MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?MSSQL_SA_PASSWORD در .env لازم است}
 
+  redis:
+    # در پروداکشن نه پورت بیرونی دارد، نه بدون رمز اجرا می‌شود؛
+    # نسخهٔ پایه برای توسعه باز و بی‌رمز است و اگر اینجا override نشود،
+    # کش/نشست‌ها روی اینترنت در دسترس می‌مانند.
+    ports: !reset []
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD در .env لازم است}", "--appendonly", "yes"]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD در .env لازم است}
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+
   web:
     restart: unless-stopped
+    # پورت اپ به بیرون باز نمی‌شود؛ تنها proxy (TLS) به آن می‌رسد.
+    ports: !reset []
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ConnectionStrings__Default: "Server=sqlserver;Database=AshianebarghProd;User Id=sa;Password=${MSSQL_SA_PASSWORD:?MSSQL_SA_PASSWORD در .env لازم است};TrustServerCertificate=True"
+      ConnectionStrings__Redis: "redis:6379,password=${REDIS_PASSWORD:?REDIS_PASSWORD در .env لازم است},abortConnect=false"
       Identity__FirstAdminPhoneNumber: ${APP_ADMIN_PHONE:?APP_ADMIN_PHONE در .env لازم است}
       # جانشینی ادمین در پروداکشن پیش‌فرض خاموش است؛ فقط برای پنجرهٔ پشتیبانی روشن کنید.
       Support__ImpersonationEnabled: ${APP_IMPERSONATION_ENABLED:-false}
       # کپچای واقعی در پروداکشن (خالی یعنی غیرفعال و مسیر OTP بدون محافظ می‌ماند).
       Captcha__Provider: ${APP_CAPTCHA_PROVIDER:-Turnstile}
+      # کلیدهای کپچا و pepper اجباری‌اند؛ استارتاپ بدون آن‌ها متوقف می‌شود تا
+      # استقرار تازه نه «باز» بماند و نه در بن‌بستِ «کلید خالی ← ورود ناممکن» بیفتد.
+      Captcha__Turnstile__SecretKey: ${APP_TURNSTILE_SECRET_KEY:?APP_TURNSTILE_SECRET_KEY در .env لازم است}
+      Captcha__Turnstile__SiteKey: ${APP_TURNSTILE_SITE_KEY:?APP_TURNSTILE_SITE_KEY در .env لازم است}
+      Security__Pepper: ${APP_SECURITY_PEPPER:?APP_SECURITY_PEPPER در .env لازم است}
+      # تنها proxy داخل شبکهٔ compose به اپ می‌رسد، پس هدرهای forwarded او پذیرفته
+      # می‌شوند تا IP واقعی کاربر برای rate limit و لاگ در دسترس باشد.
+      ForwardedHeaders__TrustAllProxies: "true"
+      # مایگریشن بهطور پیشفرض هنگام استارتاپ اجرا میشود. قبل از بالا آوردن چند نسخهٔ
+      # همزمان، این را false کنید و مایگریشن را یکبار و جداگانه اجرا نمایید.
+      Database__AutoMigrate: ${APP_AUTO_MIGRATE:-true}
     volumes:
       # کلیدهای DataProtection بیرون از کانتینر می‌مانند تا با هر redeploy
       # کوکی‌ها، توکن‌های ضدجعل و secretهای رمزنگاری‌شده نپرند.
       - dataprotection:/app/DataProtection-Keys
 
+  # خاتمهٔ TLS: Caddy با HTTPS خودکار (نیازمند دامنهٔ عمومی و پورت‌های 80/443).
+  # کوکی Secure در Production تنها روی HTTPS می‌نشیند، پس بدون این لایه ورود وب کار نمی‌کند.
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    command: ["caddy", "reverse-proxy", "--from", "${APP_DOMAIN:?APP_DOMAIN در .env لازم است}", "--to", "web:8080"]
+    volumes:
+      - caddydata:/data
+      - caddyconfig:/config
+    depends_on:
+      - web
+
 volumes:
   dataprotection:
+  caddydata:
+  caddyconfig:

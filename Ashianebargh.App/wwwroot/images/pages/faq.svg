@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 360" role="img" aria-label="سوالات متداول">
+  <rect width="480" height="360" rx="28" fill="#eef2f8"/>
+  <circle cx="240" cy="176" r="128" fill="#e4ebf7"/>
+  <path d="M96 86h196c11 0 20 9 20 20v96c0 11-9 20-20 20h-96l-42 34v-34h-58c-11 0-20-9-20-20V106c0-11 9-20 20-20z" fill="#0b345b"/>
+  <path d="M170 148c0-20 16-34 36-34s36 13 36 32c0 14-8 21-18 28-8 6-12 10-12 20" fill="none" stroke="#ffffff" stroke-width="14" stroke-linecap="round"/>
+  <circle cx="212" cy="212" r="8.5" fill="#ffffff"/>
+  <path d="M268 170h116c9 0 16 7 16 16v64c0 9-7 16-16 16h-42l-30 24v-24h-44c-9 0-16-7-16-16v-64c0-9 7-16 16-16z" fill="#e4202a"/>
+  <path d="M312 202c0-13 10-22 23-22s23 8 23 20c0 9-5 13-12 18-5 4-7 6-7 12" fill="none" stroke="#ffffff" stroke-width="9" stroke-linecap="round"/>
+  <circle cx="339" cy="243" r="5.5" fill="#ffffff"/>
+  <circle cx="92" cy="286" r="8" fill="#e4202a"/>
+  <circle cx="400" cy="96" r="7" fill="#9db4d6"/>
+  <circle cx="412" cy="286" r="10" fill="#c6d5ec"/>
+</svg>

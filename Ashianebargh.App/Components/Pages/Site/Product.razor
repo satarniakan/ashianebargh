@@ -2,17 +2,19 @@
 @layout SiteLayout
 @using Ashianebargh.Application.Content
 @using Ashianebargh.Application.Helpers
+@using Ashianebargh.App.Services
 @inject IProductService ProductService
 @inject ICategoryService CategoryService
+@inject SiteLanguage Language
 
 @if (product is null)
 {
-    <PageTitle>محصول یافت نشد | آشیانه برق</PageTitle>
+    <PageTitle>@Language["detail.notFoundTitle"]</PageTitle>
     <div class="site-container">
         <div class="site-empty">
             <i class="bi bi-box-seam"></i>
-            <p>این محصول وجود ندارد یا فعلاً غیرفعال است.</p>
-            <a href="/products" class="btn btn-sm btn-outline-secondary">بازگشت به محصولات</a>
+            <p>@Language["detail.notFound"]</p>
+            <a href="/products" class="btn btn-sm btn-outline-secondary">@Language["detail.backToProducts"]</a>
         </div>
     </div>
 }
@@ -21,10 +23,10 @@ else
     <PageTitle>@product.Name | آشیانه برق</PageTitle>
 
     <div class="site-container">
-        <nav class="site-breadcrumb" aria-label="مسیر">
-            <a href="/">خانه</a>
+        <nav class="site-breadcrumb" aria-label="@Language["aria.breadcrumb"]">
+            <a href="/">@Language["common.home"]</a>
             <span class="sep">/</span>
-            <a href="/products">محصولات</a>
+            <a href="/products">@Language["nav.products"]</a>
             <span class="sep">/</span>
             <a href="/products?category=@product.CategorySlug">@product.CategoryName</a>
             <span class="sep">/</span>
@@ -33,11 +35,11 @@ else
 
         <div class="site-detail-layout">
             <aside class="site-side">
-                <div class="site-side-head"><h2>دسته‌بندی‌ها</h2></div>
-                <nav class="site-side-nav" aria-label="دسته‌بندی محصولات">
+                <div class="site-side-head"><h2>@Language["side.categories"]</h2></div>
+                <nav class="site-side-nav" aria-label="@Language["aria.categories"]">
                     <a href="/products">
                         <span class="site-side-icon"><i class="bi bi-grid-3x3-gap"></i></span>
-                        <span class="site-side-name">همهٔ محصولات</span>
+                        <span class="site-side-name">@Language["common.allProducts"]</span>
                     </a>
                     @foreach (var category in categories)
                     {
@@ -59,7 +61,7 @@ else
 
                         @if (!string.IsNullOrWhiteSpace(product.Code))
                         {
-                            <div class="site-detail-code">کد محصول: <b>@product.Code</b></div>
+                            <div class="site-detail-code">@Language["detail.codePrefix"] <b dir="ltr">@product.Code</b></div>
                         }
 
                         @if (!string.IsNullOrWhiteSpace(product.ShortDescription))
@@ -69,7 +71,7 @@ else
 
                         <div class="site-detail-price">
                             <i class="bi bi-tag"></i>
-                            @(product.Price is null ? "برای اطلاع از قیمت تماس بگیرید" : CurrencyFormatter.ToToman(product.Price.Value))
+                            @(product.Price is null ? Language["detail.callForPrice"] : Language.FormatPrice(product.Price.Value))
                         </div>
 
                         @if (product.Tags.Count > 0)
@@ -83,8 +85,8 @@ else
                         }
 
                         <div class="site-actions-row">
-                            <a href="/contact" class="site-btn site-btn--red"><i class="bi bi-send"></i>استعلام و سفارش</a>
-                            <a href="/products" class="site-btn site-btn--navy"><i class="bi bi-grid"></i>سایر محصولات</a>
+                            <a href="/contact" class="site-btn site-btn--red"><i class="bi bi-send"></i>@Language["detail.quote"]</a>
+                            <a href="/products" class="site-btn site-btn--navy"><i class="bi bi-grid"></i>@Language["detail.other"]</a>
                         </div>
                     </div>
 
@@ -100,31 +102,31 @@ else
                     </div>
                 </div>
 
-                <h2 class="site-subhead">مشخصات محصول</h2>
+                <h2 class="site-subhead">@Language["detail.specs"]</h2>
                 <div class="site-table-wrap">
                     <table class="site-table">
                         <thead>
                             <tr>
-                                <th>ویژگی</th>
-                                <th>مقدار</th>
+                                <th>@Language["detail.attribute"]</th>
+                                <th>@Language["detail.value"]</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
-                                <td>کد محصول</td>
+                                <td>@Language["detail.code"]</td>
                                 <td class="ltr">@(string.IsNullOrWhiteSpace(product.Code) ? "—" : product.Code)</td>
                             </tr>
                             <tr>
-                                <td>دسته‌بندی</td>
+                                <td>@Language["detail.category"]</td>
                                 <td>@product.CategoryName</td>
                             </tr>
                             <tr>
-                                <td>قیمت</td>
-                                <td>@(product.Price is null ? "تماس بگیرید" : CurrencyFormatter.ToToman(product.Price.Value))</td>
+                                <td>@Language["detail.price"]</td>
+                                <td>@(product.Price is null ? Language["detail.callUs"] : Language.FormatPrice(product.Price.Value))</td>
                             </tr>
                             <tr>
-                                <td>برچسب‌ها</td>
-                                <td>@(product.Tags.Count == 0 ? "—" : string.Join("، ", product.Tags.Select(t => t.Name)))</td>
+                                <td>@Language["detail.tags"]</td>
+                                <td>@(product.Tags.Count == 0 ? "—" : string.Join(Language.IsEnglish ? ", " : "، ", product.Tags.Select(t => t.Name)))</td>
                             </tr>
                         </tbody>
                     </table>
@@ -132,7 +134,7 @@ else
 
                 @if (!string.IsNullOrWhiteSpace(product.Description))
                 {
-                    <h2 class="site-subhead">توضیحات</h2>
+                    <h2 class="site-subhead">@Language["detail.description"]</h2>
                     <div class="site-detail-desc">
                         <ContentParagraphs Text="@product.Description" />
                     </div>

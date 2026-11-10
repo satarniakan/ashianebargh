@@ -25,14 +25,12 @@ public class AshianebarghUnitOfWork : IAshianebarghUnitOfWork
         AuditLogs = services.GetRequiredService<IAuditLogRepository>();
         Notifications = services.GetRequiredService<INotificationRepository>();
         Outbox = services.GetRequiredService<IOutboxRepository>();
-        Payments = services.GetRequiredService<IPaymentRepository>();
     }
 
     public IOtpRepository OtpCodes { get; }
     public IAuditLogRepository AuditLogs { get; }
     public INotificationRepository Notifications { get; }
     public IOutboxRepository Outbox { get; }
-    public IPaymentRepository Payments { get; }
 
     public async Task<int> CompleteAsync()
     {

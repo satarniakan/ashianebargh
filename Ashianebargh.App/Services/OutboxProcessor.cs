@@ -1,4 +1,5 @@
 // Ashianebargh.App/Services/OutboxProcessor.cs
+using Ashianebargh.Application.Helpers;
 using Ashianebargh.Application.Services;
 using Ashianebargh.Domain.Entities;
 using Ashianebargh.Domain.Enums;
@@ -97,17 +98,18 @@ public class OutboxProcessor : BackgroundService
 
                         if (error is null)
                         {
-                            _logger.LogInformation("پیام {Channel} به {Recipient} ارسال شد", message.Channel, message.Recipient);
+                            _logger.LogInformation("پیام {Channel} به {Recipient} ارسال شد",
+                                message.Channel, PiiMask.Recipient(message.Recipient));
                         }
                         else if (attempts >= _maxAttempts)
                         {
                             _logger.LogError("پیام {Channel} به {Recipient} پس از {Attempts} تلاش ناموفق ماند: {Error}",
-                                message.Channel, message.Recipient, attempts, error);
+                                message.Channel, PiiMask.Recipient(message.Recipient), attempts, error);
                         }
                         else
                         {
                             _logger.LogWarning("ارسال {Channel} به {Recipient} ناموفق (تلاش {Attempts}): {Error}",
-                                message.Channel, message.Recipient, attempts, error);
+                                message.Channel, PiiMask.Recipient(message.Recipient), attempts, error);
                         }
                     }
                 }

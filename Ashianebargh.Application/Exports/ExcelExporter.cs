@@ -44,7 +44,8 @@ public class ExcelExporter : IExcelExporter
         {
             meta.Cell(3, 1).Value = "توجه";
             meta.Cell(3, 2).Value =
-                $"گزارش {table.TotalCount} ردیف دارد؛ فایل شامل همهٔ ردیف‌های فیلترشده است.";
+                $"گزارش {table.TotalCount} ردیف دارد؛ فایل شامل {table.Rows.Count} ردیف است. " +
+                "برای گرفتن بقیه، فیلتر بازه را باریک‌تر کنید.";
         }
 
         sheet.Row(1).Style.Font.Bold = true;

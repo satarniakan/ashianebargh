@@ -27,6 +27,32 @@ public static class DependencyInjection
         this IServiceCollection services, IConfiguration configuration, bool isDevelopment = false,
         string? migrationsAssembly = null)
     {
+        // گاردهای Production: استقرار تازه نباید «باز» یا «قفل» بالا بیاید.
+        // بدون این‌ها یا OTP بدون کپچا پذیرفته می‌شود (provider غیر Turnstile)، یا
+        // همهٔ ورودها شکست می‌خورند (کلید کپچا/pepper خالی) و ادمین اول هم نمی‌تواند
+        // وارد شود تا آن‌ها را از صفحهٔ تنظیمات پر کند — بن‌بست چرخه‌ای.
+        // مقادیر باید از env/appsettings برسند؛ چرخش بعدی از صفحهٔ تنظیمات (ردیف دیتابیس)
+        // مجاز است به شرطی که env همچنان یک مقدار معتبر نگه دارد.
+        if (!isDevelopment)
+        {
+            if (!string.Equals(configuration["Captcha:Provider"], "Turnstile", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException(
+                    "Captcha:Provider باید در Production روی «Turnstile» تنظیم شود؛ در غیر این صورت " +
+                    "درخواست‌های OTP بدون کپچا پذیرفته می‌شوند. برای اجرای محلی از محیط Development استفاده کنید.");
+
+            if (string.IsNullOrWhiteSpace(configuration["Captcha:Turnstile:SecretKey"]) ||
+                string.IsNullOrWhiteSpace(configuration["Captcha:Turnstile:SiteKey"]))
+                throw new InvalidOperationException(
+                    "کلیدهای Turnstile (Captcha:Turnstile:SecretKey و SiteKey) باید در Production از " +
+                    "env/appsettings موجود باشند؛ با کلید خالی اعتبارسنج fail-closed است و هیچ ورودی " +
+                    "(حتی ادمین اول) ممکن نیست.");
+
+            if (string.IsNullOrWhiteSpace(configuration["Security:Pepper"]))
+                throw new InvalidOperationException(
+                    "Security:Pepper باید در Production تنظیم شود؛ با pepper خالی هش OTP/توکن به " +
+                    "SHA-256 ساده برمی‌گردد و لو رفتن دیتابیس به‌تنهایی برای brute-force کافی است.");
+        }
+
         services.AddDbContext<AshianebarghDbContext>(opt =>
         {
             // مدلِ این context به ماژول‌های دامنه بستگی دارد؛ بدون این، EF مدلِ هر
@@ -84,7 +110,7 @@ public static class DependencyInjection
             // سفت‌وبندی صریح به‌جای اتکا به پیش‌فرض‌ها:
             // - SecurePolicy در Development همان SameAsRequest می‌ماند تا لاگین روی
             //   http://localhost هم کار کند؛ در Production همیشه Always (کوکی فقط روی HTTPS).
-            // - SameSite=Lax: تعادل CSRF و ناوبری عادی (برگشت از درگاه پرداخت top-level است و مشکلی ندارد).
+            // - SameSite=Lax: تعادل CSRF و ناوبری عادی.
             // - انقضای ۸ ساعته با تمدید لغزان به‌جای ۱۴ روز پیش‌فرض Identity.
             options.Cookie.SecurePolicy = isDevelopment
                 ? CookieSecurePolicy.SameAsRequest
@@ -107,7 +133,6 @@ public static class DependencyInjection
         services.AddScoped<ILoginHistoryRepository, LoginHistoryRepository>();
         services.AddScoped<ISettingRepository, SettingRepository>();
         services.AddScoped<INumberSequenceRepository, NumberSequenceRepository>();
-        services.AddScoped<IPaymentRepository, PaymentRepository>();
         services.AddScoped<IPushSubscriptionRepository, PushSubscriptionRepository>();
         services.AddScoped<IPushSender, VapidPushSender>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
@@ -124,41 +149,11 @@ public static class DependencyInjection
 
         // پیامک: بر اساس «Sms:Provider» — Kavenegar واقعی یا Fake.
         // FakeSmsSender فقط در Development متن پیامک (شامل کد OTP) را لاگ می‌کند.
-        // سرویس‌های بیرونی (پیامک/درگاه/کپچا) timeout صریح ۱۵ ثانیه دارند تا یک
+        // سرویس‌های بیرونی (پیامک/کپچا) timeout صریح ۱۵ ثانیه دارند تا یک
         // سرویس کند، threadpool و OutboxProcessor را قفل نکند (پیش‌فرض ۱۰۰ ثانیه است).
         services.AddHttpClient("kavenegar", client => client.Timeout = TimeSpan.FromSeconds(15));
-        services.AddHttpClient("zarinpal", client => client.Timeout = TimeSpan.FromSeconds(15));
         services.AddHttpClient("turnstile", client => client.Timeout = TimeSpan.FromSeconds(15));
         services.AddHttpClient();
-
-        // درگاه پرداخت: بر اساس «Payment:Provider» — ZarinPal/Zibal واقعی یا Fake نمایشی.
-        // Fake هیچ تماس شبکه‌ای ندارد و callback را به همین میزبان برمی‌گرداند.
-        services.AddHttpClient("zibal", client => client.Timeout = TimeSpan.FromSeconds(15));
-        services.AddScoped<IPaymentGateway>(sp =>
-        {
-            var provider = configuration["Payment:Provider"];
-            var settings = sp.GetRequiredService<ISettingService>();
-
-            if (string.Equals(provider, "ZarinPal", StringComparison.OrdinalIgnoreCase))
-            {
-                var http = sp.GetRequiredService<IHttpClientFactory>().CreateClient("zarinpal");
-                return new ZarinPalGateway(
-                    http, settings,
-                    sp.GetRequiredService<IConfiguration>(),
-                    sp.GetRequiredService<ILogger<ZarinPalGateway>>());
-            }
-
-            if (string.Equals(provider, "Zibal", StringComparison.OrdinalIgnoreCase))
-            {
-                var http = sp.GetRequiredService<IHttpClientFactory>().CreateClient("zibal");
-                return new ZibalGateway(
-                    http, settings,
-                    sp.GetRequiredService<ILogger<ZibalGateway>>());
-            }
-
-            return new FakePaymentGateway(
-                sp.GetRequiredService<ILogger<FakePaymentGateway>>(), logDetails: isDevelopment);
-        });
 
         // کپچا: بر اساس «Captcha:Provider» — Turnstile واقعی، وگرنه غیرفعال.
         // غیرفعال یعنی endpointها بدون کپچا کار می‌کنند (توسعه)؛ در Production حتماً Turnstile بگذارید.
@@ -179,7 +174,9 @@ public static class DependencyInjection
                 sp.GetRequiredService<ILogger<PermissiveCaptchaValidator>>(),
                 name: fake ? "fake" : "none",
                 logTokens: fake && isDevelopment);
-        });        services.AddScoped<ISmsSender>(sp =>
+        });
+
+        services.AddScoped<ISmsSender>(sp =>
         {
             if (string.Equals(configuration["Sms:Provider"], "Kavenegar", StringComparison.OrdinalIgnoreCase))
             {

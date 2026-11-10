@@ -8,6 +8,9 @@ using Ashianebargh.Infrastructure;
 using Ashianebargh.Infrastructure.Data;
 using Ashianebargh.App;
 using Ashianebargh.App.Middleware;
+using Ashianebargh.App.Endpoints;
+using Ashianebargh.App.Data;
+using Ashianebargh.Domain.Interfaces;
 using Serilog;
 
 Log.Logger = new LoggerConfiguration()
@@ -66,9 +69,6 @@ app.UseForwardedHeaders(forwardedHeadersOptions);
 // شناسهٔ همبستگی (X-Correlation-ID): اولِ پایپ‌لاین تا همهٔ لاگ‌ها و پاسخ‌ها آن را داشته باشند
 app.UseAshianebarghCorrelationId();
 
-// چند租户ی: تشخیص tenant از هدر یا subdomain
-app.UseAshianebarghMultiTenancy();
-
 // هدرهای امنیتی (nosniff، SAMEORIGIN، Referrer-Policy) — روی همهٔ پاسخ‌ها، از جمله خطاها.
 app.UseAshianebarghSecurityHeaders();
 
@@ -76,15 +76,34 @@ app.UseAshianebarghSecurityHeaders();
 // پیام فارسیِ امن + کد وضعیت درست؛ جزئیات فنی فقط در لاگ (و در Development در پاسخ).
 app.UseAshianebarghExceptionHandler();
 
-// اعمال خودکار مایگریشن‌های EF هنگام استارتاپ — دیگر فراموش نمی‌شوند
-using (var scope = app.Services.CreateScope())
+// اعمال خودکار مایگریشن‌های EF هنگام استارتاپ — دیگر فراموش نمی‌شوند.
+// با «Database:AutoMigrate=false» می‌توان خاموشش کرد تا مایگریشن‌ها کنترل‌شده
+// (مثلاً با یک job جدا و قبل از بالا آمدن چند نسخهٔ همزمان) اجرا شوند.
+if (builder.Configuration.GetValue("Database:AutoMigrate", true))
 {
+    using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AshianebarghDbContext>();
     await db.Database.MigrateAsync();
+}
+else
+{
+    Log.Information("Auto-migration disabled (Database:AutoMigrate=false); apply migrations manually.");
 }
 
 // مجوزها و نقش‌های پایه
 await app.Services.InitializeAshianebarghAsync();
+
+// دادهٔ نمونهٔ سایت فقط در Development و با فلگ صریح؛ اجرای دوباره رکورد تکراری نمی‌سازد.
+if (app.Environment.IsDevelopment() && args.Contains("--seed-test-content", StringComparer.OrdinalIgnoreCase))
+{
+    await using var seedScope = app.Services.CreateAsyncScope();
+    await TestContentSeeder.SeedAsync(
+        seedScope.ServiceProvider.GetRequiredService<AshianebarghDbContext>(),
+        seedScope.ServiceProvider.GetRequiredService<IFileStorage>(),
+        Path.Combine(builder.Environment.ContentRootPath, "SeedAssets", "products"),
+        seedScope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("TestContentSeed"));
+}
+
 app.UseSerilogRequestLogging();
 
 app.UseRequestLocalization(AshianebarghSetup.PersianLocalization());
@@ -100,9 +119,6 @@ app.UseHttpsRedirection();
 // تک‌بخشی مثل /app.css یا /site.css با مسیر صفحهٔ پویای /{Slug} تداخل نکند.
 app.MapStaticAssets();
 
-// output cache (Responses عمومی بدون Authorization cache می‌شوند؛ قبل از Authentication)
-app.UseOutputCache();
-
 // درخواست‌هایی که با هیچ صفحه‌ای مطابقت ندارند به صفحهٔ طراحی‌شدهٔ not-found هدایت می‌شوند.
 app.UseStatusCodePagesWithReExecute("/not-found", "?from={0}");
 
@@ -114,6 +130,7 @@ app.UseRateLimiter();
 
 // endpointهای پایه (احراز هویت و اعلان‌ها). endpoint دامنه بعد از این می‌آید.
 app.MapAshianebargh();
+app.MapSiteEndpoints();
 app.MapHealthChecks("/health");
 
 // مستندات خودکار API موبایل — فقط در Development (شامل کلید عمومی پوش و مسیرهای auth).

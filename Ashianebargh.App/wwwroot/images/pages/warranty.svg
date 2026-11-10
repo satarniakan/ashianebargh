@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 360" role="img" aria-label="گارانتی و خدمات پس از فروش">
+  <rect width="480" height="360" rx="28" fill="#eef2f8"/>
+  <circle cx="240" cy="176" r="126" fill="#e4ebf7"/>
+  <circle cx="240" cy="176" r="100" fill="#dbe5f5"/>
+  <path d="M84 132c18-26 42-40 72-44" fill="none" stroke="#c6d5ec" stroke-width="5" stroke-linecap="round"/>
+  <path d="M396 200c-12 20-30 34-54 42" fill="none" stroke="#c6d5ec" stroke-width="5" stroke-linecap="round"/>
+  <path d="M240 54l92 34v82c0 58-37 98-92 120-55-22-92-62-92-120V88z" fill="#0b345b"/>
+  <path d="M240 78l68 25v67c0 44-27 75-68 94-41-19-68-50-68-94v-67z" fill="#ffffff"/>
+  <path d="M206 172l24 24 46-52" fill="none" stroke="#e4202a" stroke-width="17" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="#e4202a">
+    <circle cx="86" cy="96" r="9"/>
+    <circle cx="402" cy="118" r="7"/>
+    <circle cx="398" cy="262" r="11"/>
+  </g>
+  <g fill="#9db4d6">
+    <circle cx="92" cy="248" r="6"/>
+    <circle cx="374" cy="70" r="5"/>
+    <circle cx="66" cy="180" r="5"/>
+  </g>
+</svg>

@@ -1,5 +1,6 @@
 ﻿using System.Security.Cryptography;
 using Microsoft.Extensions.Logging;
+using Ashianebargh.Application.Helpers;
 using Ashianebargh.Domain.Entities;
 using Ashianebargh.Domain.Exceptions;
 using Ashianebargh.Domain.Identity;
@@ -78,17 +79,6 @@ public class OtpService : IOtpService
             : new WindowState(throttle.FailedCount, throttle.FailedWindowStartUtc);
     }
 
-    private async Task<OtpThrottle> GetOrCreateThrottleAsync(string phoneNumber)
-    {
-        var throttle = await _throttles.GetByPhoneAsync(phoneNumber);
-        if (throttle is not null)
-            return throttle;
-
-        throttle = new OtpThrottle { PhoneNumber = phoneNumber };
-        await _throttles.AddAsync(throttle);
-        return throttle;
-    }
-
     /// <summary>
     /// آیا پنجره پر شده؟ پنجره «لغزان» نبود: با هر رخداد، شروعِ پنجره تمدید نمی‌شود،
     /// وگرنه یک تلاش هر ۹ دقیقه شماره را برای همیشه قفل می‌کرد.
@@ -105,59 +95,20 @@ public class OtpService : IOtpService
         return state.Count >= maxCount;
     }
 
-    private static void RegisterInWindow(OtpThrottle throttle, bool generation, DateTime nowUtc, TimeSpan window)
-    {
-        var (count, start) = generation
-            ? (throttle.GenerationCount, throttle.GenerationWindowStartUtc)
-            : (throttle.FailedCount, throttle.FailedWindowStartUtc);
-
-        // فقط شمارنده بالا می‌رود؛ شروع پنجره ثابت می‌ماند. پنجرهٔ منقضی از نو شروع می‌شود.
-        if (start is null || nowUtc - start.Value >= window)
-        {
-            count = 1;
-            start = nowUtc;
-        }
-        else
-        {
-            count++;
-        }
-
-        if (generation)
-        {
-            throttle.GenerationCount = count;
-            throttle.GenerationWindowStartUtc = start;
-        }
-        else
-        {
-            throttle.FailedCount = count;
-            throttle.FailedWindowStartUtc = start;
-        }
-    }
-
     private async Task<bool> IsBlockedAsync(string phoneNumber)
     {
         var state = await GetWindowAsync(phoneNumber, generation: false);
         return IsWindowExhausted(state, MaxFailedAttempts, AttemptWindow, _clock.GetUtcNow().UtcDateTime);
     }
 
-    private async Task RegisterFailedAttemptAsync(string phoneNumber)
-    {
-        var throttle = await GetOrCreateThrottleAsync(phoneNumber);
-        RegisterInWindow(throttle, generation: false, _clock.GetUtcNow().UtcDateTime, AttemptWindow);
-        await _unitOfWork.CompleteAsync();
-    }
+    private Task RegisterFailedAttemptAsync(string phoneNumber) =>
+        // افزایش در دیتابیس و اتمیک است: دو تلاش همزمان یکی دیگری را گم نمی‌کند
+        _throttles.RegisterAttemptAsync(
+            phoneNumber, generation: false, _clock.GetUtcNow().UtcDateTime, AttemptWindow);
 
-    private async Task ClearFailedAttemptsAsync(string phoneNumber)
-    {
-        var throttle = await _throttles.GetByPhoneAsync(phoneNumber);
-        if (throttle is null)
-            return;
-
-        // ورود موفق ⇒ شمارندهٔ تلاش‌های ناموفق پاک می‌شود
-        throttle.FailedCount = 0;
-        throttle.FailedWindowStartUtc = null;
-        await _unitOfWork.CompleteAsync();
-    }
+    // ورود موفق ⇒ شمارندهٔ تلاش‌های ناموفق پاک می‌شود
+    private Task ClearFailedAttemptsAsync(string phoneNumber) =>
+        _throttles.ClearFailedAttemptsAsync(phoneNumber);
 
     public async Task GenerateAndSendOtpAsync(string phoneNumber)
     {
@@ -167,24 +118,24 @@ public class OtpService : IOtpService
         // تا مهاجم نتواند با درخواست‌های مکرر، کدهای معتبر کاربر را باطل کند
         if (await IsBlockedAsync(phoneNumber))
         {
-            _logger.LogWarning("OTP request blocked for {PhoneNumber} after repeated failures", phoneNumber);
+            _logger.LogWarning("OTP request blocked for {PhoneNumber} after repeated failures",
+                PiiMask.Phone(phoneNumber));
             throw new BusinessRuleException(
                 "تلاش‌های ناموفق زیاد بود. لطفاً ۱۰ دقیقه دیگر تلاش کنید.");
         }
 
-        var generationState = await GetWindowAsync(phoneNumber, generation: true);
-        if (IsWindowExhausted(generationState, MaxGenerationsPerWindow, GenerationWindow,
-                _clock.GetUtcNow().UtcDateTime))
+        // شمارش پیش از ارسال و اتمیک: درخواست‌هایی که ارسالشان شکست می‌خورد هم شمرده
+        // می‌شوند (وگرنه حلقهٔ «درخواست ← خطای پیامک ← درخواست» سقف را دور می‌زند) و
+        // درخواست‌های همزمان نمی‌توانند شمارنده را از دست بدهند.
+        var generation = await _throttles.RegisterAttemptAsync(
+            phoneNumber, generation: true, _clock.GetUtcNow().UtcDateTime, GenerationWindow);
+        if (generation.GenerationCount > MaxGenerationsPerWindow)
         {
-            _logger.LogWarning("OTP generation limit reached for {PhoneNumber}", phoneNumber);
+            _logger.LogWarning("OTP generation limit reached for {PhoneNumber}",
+                PiiMask.Phone(phoneNumber));
             throw new BusinessRuleException(
                 "تعداد درخواست کد برای این شماره بیش از حد مجاز است. لطفاً ۱۵ دقیقه دیگر تلاش کنید.");
         }
-
-        // شمارش پیش از ارسال: درخواست‌هایی که ارسالشان شکست می‌خورد هم باید شمرده شوند،
-        // وگرنه حلقهٔ «درخواست ← خطای سرویس پیامک ← درخواست» سقف را دور می‌زند
-        var throttle = await GetOrCreateThrottleAsync(phoneNumber);
-        RegisterInWindow(throttle, generation: true, _clock.GetUtcNow().UtcDateTime, GenerationWindow);
 
         var code = RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
 
@@ -215,14 +166,19 @@ public class OtpService : IOtpService
             phoneNumber, otp.Id, _clock.GetUtcNow().UtcDateTime);
         await _unitOfWork.CompleteAsync();
 
-        _logger.LogInformation("OTP generated for {PhoneNumber}", phoneNumber);
+        _logger.LogInformation("OTP generated for {PhoneNumber}", PiiMask.Phone(phoneNumber));
     }
 
     public async Task<bool> VerifyOtpAsync(string phoneNumber, string code)
     {
+        // نرمال‌سازی اینجا (نه فقط در فراخواننده): هش هنگام ساخت با شمارهٔ نرمال‌شده
+        // ساخته شده و مسیر API هم بدون آن کد معتبر را رد می‌کرد.
+        phoneNumber = PersianSearch.NormalizePhone(phoneNumber);
+
         if (await IsBlockedAsync(phoneNumber))
         {
-            _logger.LogWarning("OTP verification blocked for {PhoneNumber} after repeated failures", phoneNumber);
+            _logger.LogWarning("OTP verification blocked for {PhoneNumber} after repeated failures",
+                PiiMask.Phone(phoneNumber));
             return false;
         }
 
@@ -239,19 +195,20 @@ public class OtpService : IOtpService
         if (otp is null)
         {
             await RegisterFailedAttemptAsync(phoneNumber);
-            _logger.LogWarning("Invalid or expired OTP attempt for {PhoneNumber}", phoneNumber);
+            _logger.LogWarning("Invalid or expired OTP attempt for {PhoneNumber}",
+                PiiMask.Phone(phoneNumber));
             return false;
         }
 
         // مصرف اتمیک: اگر درخواست موازی دیگری قبلاً همین کد را مصرف کرده باشد، false می‌شود
         if (!await _otpRepository.TryMarkAsUsedAsync(otp.Id))
         {
-            _logger.LogWarning("OTP already consumed by a concurrent request for {PhoneNumber}", phoneNumber);
+            _logger.LogWarning("OTP already consumed by a concurrent request for {PhoneNumber}",
+                PiiMask.Phone(phoneNumber));
             return false;
         }
 
         await ClearFailedAttemptsAsync(phoneNumber);
-        await _unitOfWork.CompleteAsync();
         return true;
     }
 

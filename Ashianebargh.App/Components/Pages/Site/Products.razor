@@ -2,29 +2,31 @@
 @layout SiteLayout
 @using Ashianebargh.Application.Content
 @using Ashianebargh.Application.DTOs
+@using Ashianebargh.App.Services
 @inject IProductService ProductService
 @inject ICategoryService CategoryService
 @inject ITagService TagService
-<PageTitle>محصولات | آشیانه برق</PageTitle>
+@inject SiteLanguage Language
+<PageTitle>@Language["products.title"]</PageTitle>
 
 <div class="site-container">
     <div class="site-page-head">
-        <nav class="site-breadcrumb" aria-label="مسیر">
-            <a href="/">خانه</a>
+        <nav class="site-breadcrumb" aria-label="@Language["aria.breadcrumb"]">
+            <a href="/">@Language["common.home"]</a>
             <span class="sep">/</span>
-            <span class="current">محصولات</span>
+            <span class="current">@Language["products.h1"]</span>
         </nav>
-        <h1>محصولات</h1>
-        <p>فهرست محصولات موجود؛ برای مشاهدهٔ جزئیات روی هر کارت کلیک کنید.</p>
+        <h1>@Language["products.h1"]</h1>
+        <p>@Language["products.lead"]</p>
     </div>
 
     <div class="site-catalog">
         <aside class="site-side">
-            <div class="site-side-head"><h2>دسته‌بندی‌ها</h2></div>
-            <nav class="site-side-nav" aria-label="دسته‌بندی محصولات">
+            <div class="site-side-head"><h2>@Language["side.categories"]</h2></div>
+            <nav class="site-side-nav" aria-label="@Language["aria.categories"]">
                 <a class="@(string.IsNullOrEmpty(Category) ? "on" : "")" href="@ListUrl(null, Tag, 1)">
                     <span class="site-side-icon"><i class="bi bi-grid-3x3-gap"></i></span>
-                    <span class="site-side-name">همهٔ محصولات</span>
+                    <span class="site-side-name">@Language["common.allProducts"]</span>
                 </a>
                 @foreach (var category in categories)
                 {
@@ -39,9 +41,9 @@
             @if (tags.Count > 0)
             {
                 <div class="site-side-tags">
-                    <h3>برچسب‌ها</h3>
+                    <h3>@Language["side.tags"]</h3>
                     <div class="site-tag-list">
-                        <a class="site-tag @(string.IsNullOrEmpty(Tag) ? "on" : "")" href="@ListUrl(Category, null, 1)">همه</a>
+                        <a class="site-tag @(string.IsNullOrEmpty(Tag) ? "on" : "")" href="@ListUrl(Category, null, 1)">@Language["side.all"]</a>
                         @foreach (var tag in tags)
                         {
                             <a class="site-tag @(Tag == tag.Slug ? "on" : "")" href="@ListUrl(Category, tag.Slug, 1)">@tag.Name</a>
@@ -60,17 +62,17 @@
             {
                 <div class="site-empty">
                     <i class="bi bi-search"></i>
-                    <p>محصولی با این فیلتر پیدا نشد.</p>
-                    <a href="/products" class="btn btn-sm btn-outline-secondary">حذف فیلترها</a>
+                    <p>@Language["products.empty"]</p>
+                    <a href="/products" class="btn btn-sm btn-outline-secondary">@Language["products.clear"]</a>
                 </div>
             }
             else
             {
                 <div class="site-catalog-bar">
-                    <span class="site-result-count">@result.TotalCount محصول</span>
+                    <span class="site-result-count">@Language.ProductCount(result.TotalCount)</span>
                     @if (!string.IsNullOrEmpty(Category) || !string.IsNullOrEmpty(Tag))
                     {
-                        <a class="site-clear" href="/products"><i class="bi bi-x-circle"></i>حذف فیلترها</a>
+                        <a class="site-clear" href="/products"><i class="bi bi-x-circle"></i>@Language["products.clear"]</a>
                     }
                 </div>
 
@@ -83,15 +85,15 @@
 
                 @if (result.TotalPages > 1)
                 {
-                    <nav class="site-pager" aria-label="صفحه‌بندی">
+                    <nav class="site-pager" aria-label="@Language["aria.pagination"]">
                         <a class="site-page-btn @(result.HasPreviousPage ? "" : "disabled")"
                            href="@ListUrl(Category, Tag, result.Page - 1)">
-                            <i class="bi bi-chevron-right"></i> قبلی
+                            <i class="bi @Language.PreviousIcon"></i> @Language["pager.previous"]
                         </a>
-                        <span class="site-pager-info">صفحهٔ @result.Page از @result.TotalPages</span>
+                        <span class="site-pager-info">@Language.PageOf(result.Page, result.TotalPages)</span>
                         <a class="site-page-btn @(result.HasNextPage ? "" : "disabled")"
                            href="@ListUrl(Category, Tag, result.Page + 1)">
-                            بعدی <i class="bi bi-chevron-left"></i>
+                            @Language["pager.next"] <i class="bi @Language.NextIcon"></i>
                         </a>
                     </nav>
                 }

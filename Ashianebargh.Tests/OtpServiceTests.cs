@@ -32,6 +32,52 @@ public class OtpServiceTests
         throttleRepo.Setup(r => r.AddAsync(It.IsAny<OtpThrottle>()))
             .Callback<OtpThrottle>(t => throttles[t.PhoneNumber] = t)
             .Returns(Task.CompletedTask);
+        // رفتار اتمیک مخزن واقعی را با حافظهٔ درون‌تستی شبیه‌سازی می‌کند
+        throttleRepo.Setup(r => r.RegisterAttemptAsync(
+                It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<DateTime>(), It.IsAny<TimeSpan>()))
+            .Returns((string phone, bool generation, DateTime now, TimeSpan window) =>
+            {
+                if (!throttles.TryGetValue(phone, out var t))
+                {
+                    t = new OtpThrottle { PhoneNumber = phone };
+                    throttles[phone] = t;
+                }
+
+                var start = generation ? t.GenerationWindowStartUtc : t.FailedWindowStartUtc;
+                var count = generation ? t.GenerationCount : t.FailedCount;
+                if (start is null || now - start.Value >= window)
+                {
+                    count = 1;
+                    start = now;
+                }
+                else
+                {
+                    count++;
+                }
+
+                if (generation)
+                {
+                    t.GenerationCount = count;
+                    t.GenerationWindowStartUtc = start;
+                }
+                else
+                {
+                    t.FailedCount = count;
+                    t.FailedWindowStartUtc = start;
+                }
+
+                return Task.FromResult(t);
+            });
+        throttleRepo.Setup(r => r.ClearFailedAttemptsAsync(It.IsAny<string>()))
+            .Callback<string>(phone =>
+            {
+                if (throttles.TryGetValue(phone, out var t))
+                {
+                    t.FailedCount = 0;
+                    t.FailedWindowStartUtc = null;
+                }
+            })
+            .Returns(Task.CompletedTask);
 
         var settings = new Mock<ISettingService>();
         settings.Setup(s => s.GetAsync(It.IsAny<string>()))

@@ -55,7 +55,6 @@ public class UnitOfWorkExtensionTests
         services.AddSingleton(Mock.Of<IAuditLogRepository>());
         services.AddSingleton(Mock.Of<INotificationRepository>());
         services.AddSingleton(Mock.Of<IOutboxRepository>());
-        services.AddSingleton(Mock.Of<IPaymentRepository>());
         await using var provider = services.BuildServiceProvider();
 
         ITestUnitOfWork uow = new TestUnitOfWork(context, provider);

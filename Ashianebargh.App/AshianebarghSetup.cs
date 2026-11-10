@@ -16,7 +16,6 @@ using Ashianebargh.App.Authentication;
 using Ashianebargh.App.Authorization;
 using Ashianebargh.App.Endpoints;
 using Microsoft.FeatureManagement;
-using Quartz;
 using Ashianebargh.App.Middleware;
 using Ashianebargh.App.Services;
 
@@ -54,15 +53,6 @@ public static class AshianebarghSetup
             services.AddDistributedMemoryCache();
         }
 
-        // Output Cache برای صفحات/endpointهای خواندنی (کاهش بار پایگاه‌داده)
-        services.AddOutputCache(options =>
-        {
-            options.DefaultExpirationTimeSpan = TimeSpan.FromMinutes(5);
-            options.AddPolicy("public", builder => builder.Expire(TimeSpan.FromMinutes(10)));
-            options.AddPolicy("private-5m", builder => builder.Expire(TimeSpan.FromMinutes(5)));
-            options.AddBasePolicy(builder => builder.Expire(TimeSpan.FromSeconds(60)));
-        });
-
         // Health Checks UI (AspNetCore.HealthChecks.UI 9.x) با EF Core 10 باینری‌سازگار
         // نیست (MissingMethodException هنگام استارتاپ). تا انتشار نسخهٔ 10، فقط /health
         // فعال است؛ داشبورد UI با پکیج سازگار دوباره اضافه می‌شود.
@@ -70,14 +60,9 @@ public static class AshianebarghSetup
         // Feature Flags (Microsoft.FeatureManagement) — بخش‌های اختیاری را بدون تغییر کد روشن/خاموش کنید
         services.AddFeatureManagement();
 
-        // Background Jobs (Quartz.NET) — کارهای دوره‌ای (پاک‌سازی، Outbox، گزارش‌گیری)
-        services.AddQuartz(q => { /* jobهای دامنه بعداً اضافه می‌شوند */ });
-        services.AddQuartzHostedService(options => options.WaitForJobsToComplete = true);
-
-        // چند租户ی: context scoped به هر درخواست
-        services.AddScoped<TenantContext>();
-        services.AddScoped<ITenantContext>(sp => sp.GetRequiredService<TenantContext>());
-
+        // کارهای دوره‌ای با IRecurringJob/BackgroundService اجرا می‌شوند (DataRetentionJob،
+        // OutboxProcessor)؛ Quartz ثبت می‌شد ولی هیچ jobی نداشت و فقط یک hosted service
+        // بلااستفاده بالا می‌آورد.
         services.AddCascadingAuthenticationState();
 
         // fetchهای JS توکن ضدجعل را در هدر X-XSRF-TOKEN می‌فرستند (ashianebarghApi.post)؛
@@ -100,7 +85,7 @@ public static class AshianebarghSetup
             .AddPolicy("Api", policy => policy
                 .AddAuthenticationSchemes(ApiTokenAuthenticationHandler.SchemeName)
                 .RequireAuthenticatedUser())
-            // endpointهای مشترک وب و موبایل (اعلان‌ها، شروع پرداخت): کوکی یا توکن
+            // endpointهای مشترک وب و موبایل (اعلان‌ها): کوکی یا توکن
             .AddPolicy("App", policy => policy
                 .AddAuthenticationSchemes(
                     IdentityConstants.ApplicationScheme,
@@ -167,18 +152,6 @@ public static class AshianebarghSetup
                         Window = TimeSpan.FromMinutes(10),
                         QueueLimit = 0
                     }));
-
-            // شروع پرداخت: هر درخواست یک فراخوانی واقعی به درگاه + یک ردیف دیتابیس است،
-            // پس کاربر لاگین‌کرده هم نباید بتواند با حلقه درگاه را بمباران کند.
-            options.AddPolicy("payment-start", httpContext =>
-                RateLimitPartition.GetFixedWindowLimiter(
-                    partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-                    factory: _ => new FixedWindowRateLimiterOptions
-                    {
-                        PermitLimit = 10,
-                        Window = TimeSpan.FromMinutes(15),
-                        QueueLimit = 0
-                    }));
         });
 
         return services;
@@ -193,7 +166,6 @@ public static class AshianebarghSetup
         app.MapNotificationsEndpoints();
         app.MapNotificationsApiEndpoints();
         app.MapAuthApiEndpoints();
-        app.MapPaymentEndpoints();
         app.MapPushEndpoints();
         app.MapImpersonationEndpoints();
         app.MapFileEndpoints();
@@ -206,10 +178,17 @@ public static class AshianebarghSetup
     /// تنظیمات پایه که باید در <c>Program.cs</c> میزبان اعمال شود، به‌ترتیب:
     /// هدرهای forwarded، فرهنگ فارسی، مدیریت خطا، middlewareهای امنیتی.
     /// </summary>
-    public static RequestLocalizationOptions PersianLocalization() => new()
+    public static RequestLocalizationOptions PersianLocalization()
     {
-        DefaultRequestCulture = new Microsoft.AspNetCore.Localization.RequestCulture("fa-IR"),
-        SupportedCultures = [new CultureInfo("fa-IR")],
-        SupportedUICultures = [new CultureInfo("fa-IR")]
-    };
+        var options = new RequestLocalizationOptions
+        {
+            DefaultRequestCulture = new Microsoft.AspNetCore.Localization.RequestCulture("fa-IR"),
+            SupportedCultures = [new CultureInfo("fa-IR"), new CultureInfo("en-US")],
+            SupportedUICultures = [new CultureInfo("fa-IR"), new CultureInfo("en-US")]
+        };
+
+        // کوکی زبان سایت بر تنظیمات مرورگر اولویت دارد
+        options.RequestCultureProviders.Insert(0, new Ashianebargh.App.Services.SiteLanguageCultureProvider());
+        return options;
+    }
 }

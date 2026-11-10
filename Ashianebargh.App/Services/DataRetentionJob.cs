@@ -8,8 +8,8 @@ namespace Ashianebargh.App.Services;
 /// توکن‌های منقضی، اعلان‌های خوانده‌شده و لاگ‌های رویداد تا ابد جمع می‌شوند.
 /// <para>
 /// سقف‌ها از appsettings خوانده می‌شوند (<c>Retention:*</c>)؛ خالی/صفر یعنی حذف نشود
-/// (پیش‌فرض‌های محافظه‌کارانه در <see cref="Defaults"/>). جدول‌های مالی/امتیازی
-/// (پرداخت، تاریخچهٔ ورودِ تازه) عمداً مشمول نیستند — حذفِ آن‌ها تصمیم دامنه است.
+/// (پیش‌فرض‌های محافظه‌کارانه در <see cref="Defaults"/>). تاریخچهٔ ورودِ تازه
+/// عمداً مشمول نیست — حذفِ آن تصمیم دامنه است.
 /// </para>
 /// </summary>
 public class DataRetentionJob : IRecurringJob
@@ -21,6 +21,7 @@ public class DataRetentionJob : IRecurringJob
         public const int NotificationDays = 90;
         public const int ApiTokenDays = 90;
         public const int AuditLogDays = 730;
+        public const int OutboxDays = 90;
     }
 
     public string Name => "data-retention";
@@ -65,6 +66,11 @@ public class DataRetentionJob : IRecurringJob
         deleted += await RunOneAsync("لاگ رویدادها", "Retention:AuditLogDays",
             Defaults.AuditLogDays, now,
             sp.GetRequiredService<IAuditLogRepository>().DeleteOlderThanAsync);
+
+        // پیام‌های Sent جدول بی‌پایان می‌سازند؛ Failed برای بررسی ادمین می‌مانند
+        deleted += await RunOneAsync("صف پیام‌ها", "Retention:OutboxDays",
+            Defaults.OutboxDays, now,
+            sp.GetRequiredService<IOutboxRepository>().DeleteSentOlderThanAsync);
 
         if (deleted > 0)
             _logger.LogInformation("خانه‌تکانی داده: {Count} ردیف حذف شد", deleted);

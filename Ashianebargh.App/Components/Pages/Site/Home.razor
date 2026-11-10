@@ -1,27 +1,26 @@
 @page "/"
 @layout SiteLayout
 @using Ashianebargh.Application.Content
+@using Ashianebargh.App.Services
 @inject IProductService ProductService
 @inject ICategoryService CategoryService
-<PageTitle>آشیانه برق | معرفی محصولات</PageTitle>
+@inject SiteLanguage Language
+<PageTitle>@Language["home.title"]</PageTitle>
 
 <section class="site-hero">
     <div class="site-container site-hero-inner">
         <div class="site-hero-text">
-            <div class="site-eyebrow">تأمین تخصصی تجهیزات برق</div>
+            <div class="site-eyebrow">@Language["home.eyebrow"]</div>
             <h1>آشیانه <span>برق</span></h1>
-            <p class="site-hero-lead">
-                معرفی و عرضهٔ محصولات برقی و روشنایی؛ همراه با راهنمایی برای انتخاب درست،
-                پشتیبانی فنی و ارسال به سراسر کشور.
-            </p>
+            <p class="site-hero-lead">@Language["home.lead"]</p>
             <div class="site-hero-actions">
                 <a class="site-btn site-btn--red" href="/products">
-                    <i class="bi bi-arrow-left"></i>
-                    مشاهدهٔ محصولات
+                    <i class="bi @Language.ForwardIcon"></i>
+                    @Language["home.viewProducts"]
                 </a>
                 <a class="site-btn site-btn--ghost" href="/contact">
                     <i class="bi bi-headset"></i>
-                    تماس با ما
+                    @Language["home.contact"]
                 </a>
             </div>
         </div>
@@ -39,19 +38,19 @@
         <ul>
             <li>
                 <span class="site-feat-icon"><i class="bi bi-boxes"></i></span>
-                <span>تنوع محصولات<small>برقی و روشنایی</small></span>
+                <span>@Language["feat.variety"]<small>@Language["feat.varietySub"]</small></span>
             </li>
             <li>
                 <span class="site-feat-icon"><i class="bi bi-person-gear"></i></span>
-                <span>مشاورهٔ فنی<small>برای انتخاب درست</small></span>
+                <span>@Language["feat.advice"]<small>@Language["feat.adviceSub"]</small></span>
             </li>
             <li>
                 <span class="site-feat-icon"><i class="bi bi-truck"></i></span>
-                <span>ارسال سراسری<small>به همهٔ شهرها</small></span>
+                <span>@Language["feat.shipping"]<small>@Language["feat.shippingSub"]</small></span>
             </li>
             <li>
                 <span class="site-feat-icon"><i class="bi bi-shield-check"></i></span>
-                <span>پشتیبانی<small>پس از فروش</small></span>
+                <span>@Language["feat.support"]<small>@Language["feat.supportSub"]</small></span>
             </li>
         </ul>
     </div>
@@ -62,19 +61,28 @@
     {
         <section class="site-section">
             <div class="site-section-head">
-                <div class="site-section-title"><h2>دسته‌بندی محصولات</h2></div>
-                <a class="site-more" href="/products">همهٔ محصولات <i class="bi bi-arrow-left"></i></a>
+                <div class="site-section-title"><h2>@Language["home.categories"]</h2></div>
+                <a class="site-more" href="/products">@Language["common.allProducts"] <i class="bi @Language.ForwardIcon"></i></a>
             </div>
 
             <div class="site-cats">
                 @foreach (var category in categories)
                 {
                     <a class="site-cat" href="/products?category=@category.Slug">
-                        <span class="site-cat-icon"><i class="bi bi-diagram-3"></i></span>
+                        <span class="site-cat-media">
+                            @if (!string.IsNullOrEmpty(category.ImageStorageId))
+                            {
+                                <img src="/media/products/@category.ImageStorageId" alt="" loading="lazy" />
+                            }
+                            else
+                            {
+                                <i class="bi bi-diagram-3"></i>
+                            }
+                        </span>
                         <span class="site-cat-name">@category.Name</span>
                         <span class="site-cat-meta">
-                            <span>@category.ProductCount محصول</span>
-                            <span class="site-arrow"><i class="bi bi-arrow-left"></i></span>
+                            <span>@Language.ProductCount(category.ProductCount)</span>
+                            <span class="site-arrow"><i class="bi @Language.ForwardIcon"></i></span>
                         </span>
                     </a>
                 }
@@ -84,15 +92,15 @@
 
     <section class="site-section">
         <div class="site-section-head">
-            <div class="site-section-title"><h2>محصولات ویژه</h2></div>
-            <a class="site-more" href="/products">همهٔ محصولات <i class="bi bi-arrow-left"></i></a>
+            <div class="site-section-title"><h2>@Language["home.featured"]</h2></div>
+            <a class="site-more" href="/products">@Language["common.allProducts"] <i class="bi @Language.ForwardIcon"></i></a>
         </div>
 
         @if (featured.Count == 0)
         {
             <div class="site-empty">
                 <i class="bi bi-box-seam"></i>
-                <p>هنوز محصول ویژه‌ای ثبت نشده است.</p>
+                <p>@Language["home.emptyFeatured"]</p>
             </div>
         }
         else

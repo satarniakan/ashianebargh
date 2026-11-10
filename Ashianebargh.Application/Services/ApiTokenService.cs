@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Ashianebargh.Domain.Entities;
 using Ashianebargh.Domain.Identity;
 using Ashianebargh.Domain.Interfaces;
+using Ashianebargh.Domain.Queries;
 
 namespace Ashianebargh.Application.Services;
 
@@ -86,11 +87,16 @@ public class ApiTokenService : IApiTokenService
     public async Task<TokenIssueResult> VerifyOtpAndIssueTokenAsync(
         string phoneNumber, string code, string? deviceName)
     {
-        if (!await _otpService.VerifyOtpAsync(phoneNumber, code))
-            return new TokenIssueResult(false);
+        // کد یک‌بارمصرف است؛ ترتیب «اول کاربر، بعد مصرف کد» لازم است تا کاربرِ
+        // ناموجود کد معتبر خودش را بی‌دلیل از دست ندهد. نرمال‌سازی هم مثل مسیر وب
+        // انجام می‌شود (ارقام فارسی/عربی) تا هش و جست‌وجوی کاربر بخواند.
+        phoneNumber = PersianSearch.NormalizePhone(phoneNumber);
 
         var user = await _userManager.FindByNameAsync(phoneNumber);
         if (user is null)
+            return new TokenIssueResult(false);
+
+        if (!await _otpService.VerifyOtpAsync(phoneNumber, code))
             return new TokenIssueResult(false);
 
         var issued = await IssueAsync(user.Id, deviceName);
@@ -126,14 +132,21 @@ public class ApiTokenService : IApiTokenService
         var now = _clock.GetUtcNow().UtcDateTime;
         var lifetimeText = await _settings.GetEffectiveAsync(
             IntegrationSettingKeys.ApiTokenLifetimeDays, "ApiTokens:LifetimeDays", "180");
-        var expiresAt = now.AddDays(
-            int.TryParse(lifetimeText, out var days) && days > 0 ? days : 180);
+        // سقف ۱۰ سال: مقدار تنظیماتِ نامعقول (مثلاً ۹۹۹۹۹۹) AddDays را سرریز می‌کرد
+        // و ورود را با استثنا می‌شکست.
+        var days = int.TryParse(lifetimeText, out var configured) && configured > 0 ? configured : 180;
+        var expiresAt = now.AddDays(Math.Clamp(days, 1, 3650));
+
+        // ستون device name محدود است؛ ورودی بلند در SaveChanges خطا می‌داد
+        var normalizedDevice = deviceName?.Trim();
+        if (normalizedDevice?.Length > 100)
+            normalizedDevice = normalizedDevice[..100];
 
         await _tokens.AddAsync(new UserApiToken
         {
             UserId = userId,
             TokenHash = await HashTokenAsync(raw),
-            DeviceName = string.IsNullOrWhiteSpace(deviceName) ? null : deviceName.Trim(),
+            DeviceName = string.IsNullOrEmpty(normalizedDevice) ? null : normalizedDevice,
             CreatedAtUtc = now,
             ExpiresAtUtc = expiresAt
         });

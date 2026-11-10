@@ -30,6 +30,7 @@ public class DataRetentionJobTests
         public Mock<IApiTokenRepository> ApiToken { get; } = new();
         public Mock<INotificationRepository> Notification { get; } = new();
         public Mock<IAuditLogRepository> AuditLog { get; } = new();
+        public Mock<IOutboxRepository> Outbox { get; } = new();
 
         public Harness()
         {
@@ -37,11 +38,13 @@ public class DataRetentionJobTests
             ApiToken.Setup(r => r.DeleteExpiredAsync(It.IsAny<DateTime>())).ReturnsAsync(0);
             Notification.Setup(r => r.DeleteReadOlderThanAsync(It.IsAny<DateTime>())).ReturnsAsync(0);
             AuditLog.Setup(r => r.DeleteOlderThanAsync(It.IsAny<DateTime>())).ReturnsAsync(0);
+            Outbox.Setup(r => r.DeleteSentOlderThanAsync(It.IsAny<DateTime>())).ReturnsAsync(0);
 
             Sp.Setup(s => s.GetService(typeof(ILoginHistoryRepository))).Returns(LoginHistory.Object);
             Sp.Setup(s => s.GetService(typeof(IApiTokenRepository))).Returns(ApiToken.Object);
             Sp.Setup(s => s.GetService(typeof(INotificationRepository))).Returns(Notification.Object);
             Sp.Setup(s => s.GetService(typeof(IAuditLogRepository))).Returns(AuditLog.Object);
+            Sp.Setup(s => s.GetService(typeof(IOutboxRepository))).Returns(Outbox.Object);
 
             Scope.Setup(s => s.ServiceProvider).Returns(Sp.Object);
             ScopeFactory.Setup(f => f.CreateScope()).Returns(Scope.Object);
@@ -63,12 +66,14 @@ public class DataRetentionJobTests
         var h = new Harness();
         var job = h.Build(Config(
             ("Retention:LoginHistoryDays", "0"),
-            ("Retention:ApiTokenDays", "-1")), Now);
+            ("Retention:ApiTokenDays", "-1"),
+            ("Retention:OutboxDays", "0")), Now);
 
         await job.ExecuteAsync(default);
 
         h.LoginHistory.Verify(r => r.DeleteOlderThanAsync(It.IsAny<DateTime>()), Times.Never);
         h.ApiToken.Verify(r => r.DeleteExpiredAsync(It.IsAny<DateTime>()), Times.Never);
+        h.Outbox.Verify(r => r.DeleteSentOlderThanAsync(It.IsAny<DateTime>()), Times.Never);
     }
 
     [Fact]
@@ -83,6 +88,7 @@ public class DataRetentionJobTests
         h.ApiToken.Verify(r => r.DeleteExpiredAsync(Now.AddDays(-DataRetentionJob.Defaults.ApiTokenDays)), Times.Once);
         h.Notification.Verify(r => r.DeleteReadOlderThanAsync(Now.AddDays(-DataRetentionJob.Defaults.NotificationDays)), Times.Once);
         h.AuditLog.Verify(r => r.DeleteOlderThanAsync(Now.AddDays(-DataRetentionJob.Defaults.AuditLogDays)), Times.Once);
+        h.Outbox.Verify(r => r.DeleteSentOlderThanAsync(Now.AddDays(-DataRetentionJob.Defaults.OutboxDays)), Times.Once);
     }
 
     [Fact]
@@ -95,13 +101,15 @@ public class DataRetentionJobTests
 
         var job = h.Build(Config(
             ("Retention:LoginHistoryDays", "30"),
-            ("Retention:ApiTokenDays", "60")), Now);
+            ("Retention:ApiTokenDays", "60"),
+            ("Retention:OutboxDays", "90")), Now);
 
         await job.ExecuteAsync(default);
 
         h.ApiToken.Verify(r => r.DeleteExpiredAsync(Now.AddDays(-60)), Times.Once);
         h.Notification.Verify(r => r.DeleteReadOlderThanAsync(It.IsAny<DateTime>()), Times.Once);
         h.AuditLog.Verify(r => r.DeleteOlderThanAsync(It.IsAny<DateTime>()), Times.Once);
+        h.Outbox.Verify(r => r.DeleteSentOlderThanAsync(It.IsAny<DateTime>()), Times.Once);
     }
 
     [Fact]
@@ -112,12 +120,14 @@ public class DataRetentionJobTests
         h.ApiToken.Setup(r => r.DeleteExpiredAsync(It.IsAny<DateTime>())).ReturnsAsync(2);
         h.Notification.Setup(r => r.DeleteReadOlderThanAsync(It.IsAny<DateTime>())).ReturnsAsync(3);
         h.AuditLog.Setup(r => r.DeleteOlderThanAsync(It.IsAny<DateTime>())).ReturnsAsync(4);
+        h.Outbox.Setup(r => r.DeleteSentOlderThanAsync(It.IsAny<DateTime>())).ReturnsAsync(5);
 
         var job = h.Build(Config(
             ("Retention:LoginHistoryDays", "30"),
             ("Retention:ApiTokenDays", "60"),
             ("Retention:NotificationDays", "7"),
-            ("Retention:AuditLogDays", "365")), Now);
+            ("Retention:AuditLogDays", "365"),
+            ("Retention:OutboxDays", "90")), Now);
 
         await job.ExecuteAsync(default);
 
@@ -125,5 +135,6 @@ public class DataRetentionJobTests
         h.ApiToken.Verify(r => r.DeleteExpiredAsync(Now.AddDays(-60)), Times.Once);
         h.Notification.Verify(r => r.DeleteReadOlderThanAsync(Now.AddDays(-7)), Times.Once);
         h.AuditLog.Verify(r => r.DeleteOlderThanAsync(Now.AddDays(-365)), Times.Once);
+        h.Outbox.Verify(r => r.DeleteSentOlderThanAsync(Now.AddDays(-90)), Times.Once);
     }
 }

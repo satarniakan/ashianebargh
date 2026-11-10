@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
 using Ashianebargh.Domain.Identity;
+using Ashianebargh.Domain.Interfaces;
 
 namespace Ashianebargh.Application.Services;
 
@@ -28,11 +29,14 @@ public class PermissionService : IPermissionService
 {
     private readonly RoleManager<IdentityRole> _roleManager;
     private readonly IPermissionCatalog _catalog;
+    private readonly IAshianebarghUnitOfWork _unitOfWork;
 
-    public PermissionService(RoleManager<IdentityRole> roleManager, IPermissionCatalog catalog)
+    public PermissionService(RoleManager<IdentityRole> roleManager, IPermissionCatalog catalog,
+        IAshianebarghUnitOfWork unitOfWork)
     {
         _roleManager = roleManager;
         _catalog = catalog;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<IReadOnlyList<PermissionStateDto>> GetPermissionStatesAsync(string roleName)
@@ -65,20 +69,48 @@ public class PermissionService : IPermissionService
                 Description = $"این مجوزها ناشناخته‌اند: {string.Join("، ", unknown)}"
             });
 
-        var currentClaims = await _roleManager.GetClaimsAsync(role);
-        foreach (var claim in currentClaims.Where(c => c.Type == Permissions.ClaimType))
+        // حذف و افزودن باید اتمیک باشد: قبلاً اگر وسط کار خطایی می‌داد، نقش با
+        // مجموعهٔ ناقص مجوزها می‌ماند و کاربرانش دسترسی از دست می‌دادند.
+        IdentityResult? failure = null;
+        try
         {
-            var removeResult = await _roleManager.RemoveClaimAsync(role, claim);
-            if (!removeResult.Succeeded) return removeResult;
-        }
+            await _unitOfWork.ExecuteInTransactionAsync(async () =>
+            {
+                var currentClaims = await _roleManager.GetClaimsAsync(role);
+                foreach (var claim in currentClaims.Where(c => c.Type == Permissions.ClaimType))
+                {
+                    var removeResult = await _roleManager.RemoveClaimAsync(role, claim);
+                    if (!removeResult.Succeeded)
+                    {
+                        failure = removeResult;
+                        throw new PermissionUpdateAbortedException();
+                    }
+                }
 
-        foreach (var permission in permissions.Distinct())
+                foreach (var permission in permissions.Distinct())
+                {
+                    var addResult = await _roleManager.AddClaimAsync(
+                        role, new Claim(Permissions.ClaimType, permission));
+                    if (!addResult.Succeeded)
+                    {
+                        failure = addResult;
+                        throw new PermissionUpdateAbortedException();
+                    }
+                }
+            });
+        }
+        catch (PermissionUpdateAbortedException)
         {
-            var addResult = await _roleManager.AddClaimAsync(role, new Claim(Permissions.ClaimType, permission));
-            if (!addResult.Succeeded) return addResult;
+            _unitOfWork.ClearChangeTracker();
+            return failure!;
         }
 
         return IdentityResult.Success;
+    }
+
+    /// <summary>فقط برای شکستن تراکنش پس از ثبت نتیجهٔ Identity؛ بیرون نمی‌رود.</summary>
+    private sealed class PermissionUpdateAbortedException : Exception
+    {
     }
 
     private async Task<HashSet<string>> GetGrantedKeysAsync(string roleName)

@@ -1,12 +1,12 @@
 {
-  "name": "سامانه",
-  "short_name": "سامانه",
-  "description": "برنامهٔ وب فارسی راست‌به‌چپ",
+  "name": "آشیانه برق",
+  "short_name": "آشیانه برق",
+  "description": "تأمین تجهیزات برق و روشنایی",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#f8f9fb",
-  "theme_color": "#2563eb",
+  "background_color": "#0b345b",
+  "theme_color": "#0b345b",
   "dir": "rtl",
   "lang": "fa",
   "icons": [

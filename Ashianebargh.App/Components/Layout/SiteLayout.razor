@@ -3,44 +3,58 @@
 @using Ashianebargh.Application.Content
 @using Ashianebargh.Application.Services
 @using Ashianebargh.Domain.Identity
+@using Ashianebargh.App.Services
 @inject AuthenticationStateProvider AuthStateProvider
 @inject IServiceScopeFactory ScopeFactory
 @inject NavigationManager Nav
+@inject SiteLanguage Language
 
-<div class="site-shell">
+<div class="site-shell" dir="@Language.Dir" lang="@Language.Code" data-lang="@Language.Code">
     <header class="site-header">
         <div class="site-header-inner">
             <a class="site-brand" href="/">
-                <span class="site-brand-mark"><i class="bi bi-lightning-charge-fill"></i></span>
+                <img class="site-brand-mark" src="/logo.png" alt="" width="44" height="44" />
                 <span class="site-brand-text">
                     <span class="site-brand-name">@siteName</span>
-                    <span class="site-brand-sub">تأمین تجهیزات برق و روشنایی</span>
+                    <span class="site-brand-sub">@T("brand.tagline")</span>
                 </span>
             </a>
 
-            <nav class="site-nav" aria-label="منوی اصلی">
-                <a href="/" class="@NavClass("/")">صفحه اصلی</a>
-                <a href="/products" class="@NavClass("/products")">محصولات</a>
+            <nav class="site-nav" aria-label="@T("aria.mainMenu")">
+                <a href="/" class="@NavClass("/")">@T("nav.home")</a>
+                <a href="/products" class="@NavClass("/products")">@T("nav.products")</a>
                 @foreach (var item in menu)
                 {
                     <a href="/@item.Slug" class="@NavClass("/" + item.Slug)">@item.Title</a>
                 }
-                <a href="/about" class="@NavClass("/about")">درباره ما</a>
-                <a href="/contact" class="@NavClass("/contact")">تماس با ما</a>
+                <a href="/about" class="@NavClass("/about")">@T("nav.about")</a>
+                <a href="/contact" class="@NavClass("/contact")">@T("nav.contact")</a>
             </nav>
 
             <div class="site-actions">
+                <div class="site-tools">
+                    <a class="site-tool site-tool-lang" href="@LanguageSwitchUrl"
+                       data-lang-toggle="@(Language.IsEnglish ? "fa" : "en")"
+                       title="@T("tool.language")" aria-label="@T("tool.language")">
+                        @(Language.IsEnglish ? "فا" : "EN")
+                    </a>
+                    <button type="button" class="site-tool theme-toggle" data-theme-toggle
+                            title="@T("tool.theme")" aria-label="@T("tool.theme")" aria-pressed="false">
+                        <i class="bi bi-moon-stars-fill"></i>
+                    </button>
+                </div>
+
                 <a class="site-cta" href="/contact">
                     <i class="bi bi-send-fill"></i>
-                    <span>درخواست استعلام</span>
+                    <span>@T("action.quote")</span>
                 </a>
                 @if (isAuthenticated)
                 {
-                    <a class="site-login" href="/dashboard"><i class="bi bi-speedometer2"></i><span>پنل مدیریت</span></a>
+                    <a class="site-login" href="/dashboard"><i class="bi bi-speedometer2"></i><span>@T("action.dashboard")</span></a>
                 }
                 else
                 {
-                    <a class="site-login" href="/login"><i class="bi bi-person"></i><span>ورود</span></a>
+                    <a class="site-login" href="/login"><i class="bi bi-person"></i><span>@T("action.login")</span></a>
                 }
             </div>
         </div>
@@ -54,12 +68,12 @@
         <div class="site-footer-inner">
             <div class="site-footer-brand">
                 <a class="site-brand" href="/">
-                    <span class="site-brand-mark"><i class="bi bi-lightning-charge-fill"></i></span>
+                    <img class="site-brand-mark" src="/logo.png" alt="" width="42" height="42" />
                     <span class="site-brand-text">
                         <span class="site-brand-name">@siteName</span>
                     </span>
                 </a>
-                <p>@(contact?.WorkingHours ?? "همراه شما برای انتخاب درست")</p>
+                <p>@(contact?.WorkingHours ?? T("footer.fallback"))</p>
             </div>
 
             <div class="site-footer-info">
@@ -77,7 +91,9 @@
                 }
             </div>
 
-            <div class="site-footer-meta">© @(new System.Globalization.PersianCalendar().GetYear(DateTime.Now)) — @siteName</div>
+            <div class="site-footer-meta">© @(Language.IsEnglish
+                ? DateTime.Now.Year.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                : new System.Globalization.PersianCalendar().GetYear(DateTime.Now).ToString("0", System.Globalization.CultureInfo.InvariantCulture)) — @siteName</div>
         </div>
     </footer>
 </div>
@@ -87,6 +103,18 @@
     private List<PageMenuItemDto> menu = new();
     private ContactInfoDto? contact;
     private bool isAuthenticated;
+
+    private string T(string key) => Language[key];
+
+    private string LanguageSwitchUrl
+    {
+        get
+        {
+            var target = Language.IsEnglish ? "fa" : "en";
+            var current = "/" + Nav.ToBaseRelativePath(Nav.Uri);
+            return $"/lang/{target}?returnUrl={Uri.EscapeDataString(current)}";
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {

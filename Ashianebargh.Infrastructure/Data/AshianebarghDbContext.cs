@@ -59,7 +59,6 @@ public class AshianebarghDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<LoginHistory> LoginHistories => Set<LoginHistory>();
     public DbSet<Setting> Settings => Set<Setting>();
     public DbSet<NumberSequence> NumberSequences => Set<NumberSequence>();
-    public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<PushSubscription> PushSubscriptions => Set<PushSubscription>();
 
     protected override void OnModelCreating(ModelBuilder builder)
@@ -122,19 +121,6 @@ public class AshianebarghDbContext : IdentityDbContext<ApplicationUser>
             e.HasKey(x => x.Name);
             e.Property(x => x.Name).HasMaxLength(128);
             e.Property(x => x.RowVersion).IsRowVersion();
-        });
-
-        builder.Entity<Payment>(e =>
-        {
-            e.HasKey(x => x.Id);
-            e.Property(x => x.UserId).HasMaxLength(450).IsRequired();
-            e.Property(x => x.Description).HasMaxLength(500).IsRequired();
-            e.Property(x => x.Gateway).HasMaxLength(32).IsRequired();
-            e.Property(x => x.Authority).HasMaxLength(64).IsRequired();
-            e.Property(x => x.CardPanMasked).HasMaxLength(32);
-            e.Property(x => x.FailureReason).HasMaxLength(500);
-            e.HasIndex(x => x.Authority).IsUnique();
-            e.HasIndex(x => new { x.UserId, x.Status });
         });
 
         builder.Entity<PushSubscription>(e =>

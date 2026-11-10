@@ -1,6 +1,8 @@
 @* کارت محصول مشترک صفحهٔ اول و فهرست محصولات. *@
 @using Ashianebargh.Application.Content
 @using Ashianebargh.Application.Helpers
+@using Ashianebargh.App.Services
+@inject SiteLanguage Language
 
 <a class="site-product-card" href="/product/@Product.Slug">
     <div class="site-product-media">
@@ -17,9 +19,9 @@
     <div class="site-product-bar">
         <span class="site-product-info">
             <span class="site-product-name" title="@Product.Name">@Product.Name</span>
-            <span class="site-product-price">@(Product.Price is null ? "برای قیمت تماس بگیرید" : CurrencyFormatter.ToToman(Product.Price.Value))</span>
+            <span class="site-product-price">@(Product.Price is null ? Language["card.callForPrice"] : Language.FormatPrice(Product.Price.Value))</span>
         </span>
-        <span class="site-product-arrow"><i class="bi bi-arrow-left"></i></span>
+        <span class="site-product-arrow"><i class="bi @Language.ForwardIcon"></i></span>
     </div>
 </a>
 

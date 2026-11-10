@@ -91,9 +91,12 @@ public class OutboxRepository : IOutboxRepository
 
         var totalCount = await query.CountAsync();
 
+        // Offset در long تا page بسیار بزرگ با ضرب int سرریز و منفی نشود
+        var skip = Math.Min((long)Math.Max(0, page - 1) * pageSize, int.MaxValue);
+
         var items = await query
             .OrderByDescending(m => m.CreatedAt)
-            .Skip((page - 1) * pageSize)
+            .Skip((int)skip)
             .Take(pageSize)
             .ToListAsync();
 
@@ -114,4 +117,10 @@ public class OutboxRepository : IOutboxRepository
 
     public Task<int> CountAsync(OutboxStatus status) =>
         _context.OutboxMessages.CountAsync(m => m.Status == status);
+
+    public Task<int> DeleteSentOlderThanAsync(DateTime cutoffUtc) =>
+        _context.OutboxMessages
+            // رکوردهای قدیمی ممکن است SentAt نداشته باشند؛ زمان ساخت جایگزین است
+            .Where(m => m.Status == OutboxStatus.Sent && (m.SentAt ?? m.CreatedAt) < cutoffUtc)
+            .ExecuteDeleteAsync();
 }

@@ -98,7 +98,7 @@ dotnet test MyProject.Tests/MyProject.Tests.csproj</pre>
       <li>با شماره‌ای که در <code class="inline">FirstAdminPhoneNumber</code> گذاشتید وارد شوید (کد پیامکی).</li>
       <li>اولین ورودِ آن شماره، نقش <b>ادمین</b> می‌گیرد؛ بقیه «کاربر» می‌شوند.</li>
       <li>منو را ببینید: مدیریت کاربران، تنظیمات، گزارش رویدادها.</li>
-      <li>صفحه‌های مدیریتی آماده: <code class="inline">/admin/users</code> (با <b>ایمپورت اکسل</b> + گزارش خطای هر سطر)، <code class="inline">/admin/outbox</code> (صف پیامک/ایمیل/پوش + <b>تلاش دوباره</b> برای ناموفق‌ها)، <code class="inline">/admin/payments</code> و داشبورد.</li>
+      <li>صفحه‌های مدیریتی آماده: <code class="inline">/admin/users</code> (با <b>ایمپورت اکسل</b> + گزارش خطای هر سطر)، <code class="inline">/admin/outbox</code> (صف پیامک/ایمیل/پوش + <b>تلاش دوباره</b> برای ناموفق‌ها) و داشبورد.</li>
       <li><b>تعیین/فراموشی رمز:</b> در صفحهٔ ورود، لینک «رمز عبور را فراموش کرده‌اید؟» به <code class="inline">/reset-password</code> می‌رود؛ یک جریان <b>دو مرحله‌ای</b> (وارد کردن شماره → کد پیامکی + رمز جدید). برای کاربرِ بی‌رمز (مثلاً واردشده با اکسل) همین مسیر «تعیین اول» است. کد یک‌بارمصرف است و عدم تطابق رمز پیش از مصرف کد پیام می‌دهد.</li>
     </ol>
   </section>
@@ -144,7 +144,6 @@ dotnet test MyProject.Tests/MyProject.Tests.csproj</pre>
     <ul>
       <li><code class="inline">Sms:Provider=Kavenegar</code> + کلید واقعی؛ قالب‌ها در صفحه تنظیمات بازبینی شوند.</li>
       <li><code class="inline">Captcha:Provider=Turnstile</code> + SiteKey/SecretKey.</li>
-      <li><code class="inline">Payment:Provider=ZarinPal</code> + MerchantId (مبالغ به تومان).</li>
       <li><code class="inline">Push:Vapid</code> با <code class="inline">npx web-push generate-vapid-keys</code>.</li>
       <li><code class="inline">Support:ImpersonationEnabled</code> خاموش بماند مگر برای پشتیبانی.</li>
       <li>HTTPS + بکاپ دوره‌ای دیتابیس + نگهداری لاگ Serilog.</li>

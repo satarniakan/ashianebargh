@@ -2,18 +2,20 @@
 @layout SiteLayout
 @rendermode InteractiveServer
 @using Ashianebargh.Application.Content
+@using Ashianebargh.App.Services
 @inject IContactService ContactService
-<PageTitle>تماس با ما | آشیانه برق</PageTitle>
+@inject SiteLanguage Language
+<PageTitle>@Language["contact.title"]</PageTitle>
 
 <div class="site-container">
     <div class="site-page-head">
-        <nav class="site-breadcrumb" aria-label="مسیر">
-            <a href="/">خانه</a>
+        <nav class="site-breadcrumb" aria-label="@Language["aria.breadcrumb"]">
+            <a href="/">@Language["common.home"]</a>
             <span class="sep">/</span>
-            <span class="current">تماس با ما</span>
+            <span class="current">@Language["contact.h1"]</span>
         </nav>
-        <h1>تماس با ما</h1>
-        <p>برای استعلام قیمت، مشاورهٔ فنی یا پیگیری سفارش، از راه‌های زیر با ما در ارتباط باشید.</p>
+        <h1>@Language["contact.h1"]</h1>
+        <p>@Language["contact.lead"]</p>
     </div>
 
     @if (info is null)
@@ -30,7 +32,7 @@
             <div class="site-panel">
                 <div class="site-panel-title">
                     <span class="site-panel-icon"><i class="bi bi-geo-alt"></i></span>
-                    اطلاعات تماس ما
+                    @Language["contact.infoTitle"]
                 </div>
 
                 <div class="site-info-list">
@@ -39,7 +41,7 @@
                         <div class="site-info-item">
                             <i class="bi bi-geo-alt"></i>
                             <div>
-                                <div class="site-info-label">نشانی</div>
+                                <div class="site-info-label">@Language["contact.address"]</div>
                                 <div class="site-info-value">@info.Address</div>
                             </div>
                         </div>
@@ -49,7 +51,7 @@
                         <div class="site-info-item">
                             <i class="bi bi-telephone"></i>
                             <div>
-                                <div class="site-info-label">تلفن</div>
+                                <div class="site-info-label">@Language["contact.phone"]</div>
                                 <div class="site-info-value"><a href="tel:@info.Phone" dir="ltr">@info.Phone</a></div>
                             </div>
                         </div>
@@ -59,7 +61,7 @@
                         <div class="site-info-item">
                             <i class="bi bi-phone"></i>
                             <div>
-                                <div class="site-info-label">همراه</div>
+                                <div class="site-info-label">@Language["contact.mobile"]</div>
                                 <div class="site-info-value"><a href="tel:@info.Mobile" dir="ltr">@info.Mobile</a></div>
                             </div>
                         </div>
@@ -69,7 +71,7 @@
                         <div class="site-info-item">
                             <i class="bi bi-envelope"></i>
                             <div>
-                                <div class="site-info-label">ایمیل</div>
+                                <div class="site-info-label">@Language["contact.email"]</div>
                                 <div class="site-info-value"><a href="mailto:@info.Email" dir="ltr">@info.Email</a></div>
                             </div>
                         </div>
@@ -79,7 +81,7 @@
                         <div class="site-info-item">
                             <i class="bi bi-clock"></i>
                             <div>
-                                <div class="site-info-label">ساعات کاری</div>
+                                <div class="site-info-label">@Language["contact.hours"]</div>
                                 <div class="site-info-value">@info.WorkingHours</div>
                             </div>
                         </div>
@@ -102,14 +104,14 @@
             <div class="site-panel site-form">
                 <div class="site-panel-title">
                     <span class="site-panel-icon"><i class="bi bi-envelope-paper"></i></span>
-                    برای ما پیام بفرستید
+                    @Language["contact.formTitle"]
                 </div>
 
                 @if (submitted)
                 {
                     <div class="alert alert-success">
-                        پیام شما ثبت شد؛ در اولین فرصت پاسخ می‌دهیم.
-                        <button class="btn btn-sm btn-outline-success ms-2" @onclick="() => submitted = false">ارسال پیام دیگر</button>
+                        @Language["contact.success"]
+                        <button class="btn btn-sm btn-outline-success ms-2" @onclick="() => submitted = false">@Language["contact.sendAnother"]</button>
                     </div>
                 }
 
@@ -118,17 +120,17 @@
                     <EditForm Model="form" OnValidSubmit="SubmitAsync">
                         <DataAnnotationsValidator />
                         <div class="site-form-grid">
-                            <AppTextField Label="نام و نام خانوادگی" @bind-Value="form.Name" Required WrapperClass="site-field" />
-                            <AppTextField Label="شماره تماس" @bind-Value="form.Phone" Required WrapperClass="site-field" />
-                            <AppTextField Label="ایمیل (اختیاری)" @bind-Value="form.Email" InputType="email" WrapperClass="site-field" />
-                            <AppTextField Label="موضوع (اختیاری)" @bind-Value="form.Subject" WrapperClass="site-field" />
-                            <AppTextArea Label="متن پیام" @bind-Value="form.Message" Rows="5" Required ShowCount
+                            <AppTextField Label="@Language["form.name"]" @bind-Value="form.Name" Required WrapperClass="site-field" />
+                            <AppTextField Label="@Language["form.phone"]" @bind-Value="form.Phone" Required WrapperClass="site-field" />
+                            <AppTextField Label="@Language["form.email"]" @bind-Value="form.Email" InputType="email" WrapperClass="site-field" />
+                            <AppTextField Label="@Language["form.subject"]" @bind-Value="form.Subject" WrapperClass="site-field" />
+                            <AppTextArea Label="@Language["form.message"]" @bind-Value="form.Message" Rows="5" Required ShowCount
                                          WrapperClass="site-field site-field--full" />
                         </div>
 
                         <button type="submit" class="btn btn-primary" disabled="@sending">
                             <i class="bi bi-send me-1"></i>
-                            @(sending ? "در حال ارسال…" : "ارسال پیام")
+                            @(sending ? Language["form.sending"] : Language["form.send"])
                         </button>
                     </EditForm>
                 }
@@ -140,10 +142,10 @@
             <div class="site-panel site-map">
                 <div class="site-panel-title">
                     <span class="site-panel-icon"><i class="bi bi-map"></i></span>
-                    موقعیت ما
+                    @Language["contact.map"]
                 </div>
                 <iframe src="@MapUrl" loading="lazy" referrerpolicy="no-referrer-when-downgrade"
-                        title="نقشهٔ محل شرکت"></iframe>
+                        title="@Language["contact.mapTitle"]"></iframe>
             </div>
         }
     }
@@ -164,9 +166,9 @@
     {
         info = await Service.GetInfoAsync();
 
-        AddSocial("اینستاگرام", "bi-instagram", info.Instagram);
-        AddSocial("تلگرام", "bi-telegram", info.Telegram);
-        AddSocial("واتس‌اپ", "bi-whatsapp", info.WhatsApp);
+        AddSocial(Language["social.instagram"], "bi-instagram", info.Instagram);
+        AddSocial(Language["social.telegram"], "bi-telegram", info.Telegram);
+        AddSocial(Language["social.whatsapp"], "bi-whatsapp", info.WhatsApp);
     }
 
     private void AddSocial(string title, string icon, string? value)

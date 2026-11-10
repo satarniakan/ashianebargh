@@ -4,6 +4,7 @@ using Ashianebargh.Domain.Content;
 using Ashianebargh.Domain.Identity;
 using Ashianebargh.Domain.Interfaces;
 using Ashianebargh.App.Components.Layout;
+using Ashianebargh.App.Services;
 
 namespace Ashianebargh.App;
 
@@ -25,7 +26,7 @@ public sealed class AppPermissionCatalog : IPermissionCatalog
 
 /// <summary>
 /// کاتالوگ تنظیمات میزبان: کلیدهای پایه + همهٔ تنظیمات اتصال‌ها (پیامک، ایمیل،
-/// پرداخت، کپچا، وب‌پوش، توکن). مقادیر محرمانه رمزنگاری‌شده ذخیره می‌شوند.
+/// کپچا، وب‌پوش، توکن). مقادیر محرمانه رمزنگاری‌شده ذخیره می‌شوند.
 /// ترتیب مقدار مؤثر هر کلید: ردیف دیتابیس ← appsettings ← پیش‌فرض؛ پس خالی
 /// گذاشتن یعنی «از appsettings بخوان».
 /// </summary>
@@ -48,14 +49,6 @@ public sealed class AppSettingCatalog : ISettingCatalog
         new(IntegrationSettingKeys.SmtpPassword, "رمز SMTP", "", "ایمیل", IsSecret: true),
         new(IntegrationSettingKeys.SmtpFromAddress, "فرستنده (FromAddress)", "", "ایمیل"),
         new(IntegrationSettingKeys.SmtpFromName, "نام فرستنده (FromName)", "", "ایمیل"),
-
-        new(IntegrationSettingKeys.ZarinPalMerchantId, "مرچنت زرین‌پال (Payment:ZarinPal:MerchantId)",
-            "", "پرداخت", IsSecret: true),
-        new(IntegrationSettingKeys.ZarinPalSandbox, "حالت sandbox زرین‌پال (true/false)", "", "پرداخت"),
-
-        new(IntegrationSettingKeys.ZibalMerchantId, "مرچنت زیبال (Payment:Zibal:MerchantId)",
-            "", "پرداخت", IsSecret: true),
-        new(IntegrationSettingKeys.ZibalSandbox, "حالت sandbox زیبال (true/false)", "", "پرداخت"),
 
         new(IntegrationSettingKeys.TurnstileSecretKey, "کلید محرمانه Turnstile (سرور)",
             "", "کپچا", IsSecret: true),
@@ -95,7 +88,6 @@ public sealed class AppNavProvider : INavProvider
             NavItem.Link("مجوز نقش‌ها", "admin/roles", "bi-key", Roles.Admin),
             NavItem.Link("اعلان سراسری", "admin/broadcast", "bi-megaphone", Roles.Admin),
             NavItem.Link("صف پیام‌ها", "admin/outbox", "bi-send", Roles.Admin),
-            NavItem.Link("پرداخت‌ها", "admin/payments", "bi-credit-card", Roles.Admin),
             NavItem.Link("تنظیمات", "admin/settings", "bi-sliders", Roles.Admin)),
 
         // سیستم — لاگ‌ها و تنظیمات حساب
@@ -132,6 +124,7 @@ public static class AppSetup
         services.AddSingleton<INavProvider, AppNavProvider>();
         // سیاست فایل با TryAdd تا پروژهٔ مصرف‌کننده بتواند قبل از/بعد از این پیش‌فرض را ثبت کند
         services.TryAddSingleton<IFileAccessPolicy, OwnerOrAdminFileAccessPolicy>();
+        services.AddScoped<SiteLanguage>();
         return services;
     }
 }

@@ -15,7 +15,7 @@ public static class SlugHelper
         "about", "contact", "products", "product", "category", "tag",
         "login", "login-password", "logout", "verify-otp", "reset-password",
         "profile", "notifications", "sessions", "audit-logs", "admin", "dashboard",
-        "payment-result", "not-found", "error", "health", "health-ui",
+        "not-found", "error", "health", "health-ui",
         "files", "media", "api", "account", "openapi", "_framework"
     };
 

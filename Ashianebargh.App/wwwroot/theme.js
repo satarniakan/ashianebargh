@@ -39,20 +39,6 @@
         });
     }
 
-    // ”zelf-healing”: اگر هر کد/js nào data-theme را بگیرد، بلافاصله به حالت قبل بازمی‌گردد
-    const observer = new MutationObserver((mutations) => {
-        for (const m of mutations) {
-            if (m.attributeName === 'data-theme' || m.attributeName === 'data-bs-theme') {
-                const current = docEl.getAttribute('data-theme');
-                if (current !== initialTheme && current !== saved) {
-                    // فقط وقتی keystroke‌های خارجی هستند، بازگردانی می‌کنیم
-                    apply(current || initialTheme);
-                }
-            }
-        }
-    });
-    observer.observe(docEl, { attributes: true, attributeFilter: ['data-theme', 'data-bs-theme'] });
-
     // Blazor navigate events (client-side navigation) را شنونده می‌گیرد تا تم حفظ شود
     if (window.Blazor && window.Blazor.navigation) {
         window.Blazor.navigation.addEventListener('navigate', () => {

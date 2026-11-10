@@ -9,12 +9,18 @@ public static class SecurityHeadersExtensions
 {
     /// <summary>
     /// CSP که با Blazor Server و Turnstile سازگار است.
+    /// <para>
+    /// <c>'unsafe-inline'</c> و <c>'unsafe-eval'</c> عمداً مانده‌اند: اسکریپت راه‌انداز
+    /// Blazor و مکانیزم بارگذاری ماژول‌هایش بدون آن‌ها اجرا نمی‌شود. عوضِ حذفشان،
+    /// دامنه‌های شخص ثالثِ بی‌استفاده (jsdelivr) حذف شده‌اند؛ همهٔ دارایی‌های ظاهری
+    /// از خود سرور سرو می‌شوند.
+    /// </para>
     /// </summary>
     public const string ContentSecurityPolicy =
         "default-src 'self'; " +
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://cdn.jsdelivr.net; " +
-        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
-        "font-src 'self' data: https://cdn.jsdelivr.net; " +
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com; " +
+        "style-src 'self' 'unsafe-inline'; " +
+        "font-src 'self' data:; " +
         "img-src 'self' data: blob: https:; " +
         "connect-src 'self' ws: wss: https://challenges.cloudflare.com; " +
         "frame-src https://challenges.cloudflare.com; " +

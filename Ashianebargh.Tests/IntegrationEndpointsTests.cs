@@ -17,7 +17,7 @@ using Xunit;
 namespace Ashianebargh.Tests;
 
 /// <summary>
-/// تست یکپارچگی endpointهای auth/payment/notification با TestHost (بدون دیتابیس واقعی).
+/// تست یکپارچگی endpointهای auth/notification با TestHost (بدون دیتابیس واقعی).
 /// </summary>
 public class IntegrationEndpointsTests : IAsyncLifetime
 {
@@ -42,8 +42,7 @@ public class IntegrationEndpointsTests : IAsyncLifetime
         {
             ["ConnectionStrings:Default"] =
                 "Server=(localdb)\\mssqllocaldb;Database=AshianebarghTest;Trusted_Connection=True;TrustServerCertificate=True",
-            ["Sms:Provider"] = "Fake",
-            ["Payment:Provider"] = "Fake"
+            ["Sms:Provider"] = "Fake"
         });
 
         builder.WebHost.UseTestServer();
@@ -57,7 +56,6 @@ public class IntegrationEndpointsTests : IAsyncLifetime
 
         _app.UseAshianebarghSecurityHeaders();
         _app.UseAshianebarghCorrelationId();
-        _app.UseAshianebarghMultiTenancy();
         _app.UseAuthentication();
         _app.UseAuthorization();
         _app.UseAntiforgery();
@@ -110,14 +108,5 @@ public class IntegrationEndpointsTests : IAsyncLifetime
         request.Headers.Add("X-Correlation-ID", "test-corr-123");
         var response = await _client.SendAsync(request);
         Assert.True(response.Headers.Contains("X-Correlation-ID"));
-    }
-
-    [Fact]
-    public async Task TenantHeader_IsAccepted()
-    {
-        var request = new HttpRequestMessage(HttpMethod.Get, "/ping");
-        request.Headers.Add("X-Tenant-ID", "acme");
-        var response = await _client.SendAsync(request);
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 }

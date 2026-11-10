@@ -1,27 +1,31 @@
 @page "/{Slug}"
 @layout SiteLayout
 @using Ashianebargh.Application.Content
+@using Ashianebargh.App.Services
 @inject IPageService PageService
+@inject SiteLanguage Language
 
 @if (view is null)
 {
-    <PageTitle>صفحه یافت نشد | آشیانه برق</PageTitle>
+    <PageTitle>@Language["page.notFoundTitle"]</PageTitle>
     <div class="site-container">
         <div class="site-empty">
             <i class="bi bi-compass"></i>
-            <p>صفحه‌ای با این آدرس وجود ندارد یا منتشر نشده است.</p>
-            <a href="/" class="btn btn-sm btn-outline-secondary">بازگشت به صفحهٔ اول</a>
+            <p>@Language["page.notFound"]</p>
+            <a href="/" class="btn btn-sm btn-outline-secondary">@Language["page.backHome"]</a>
         </div>
     </div>
 }
 else
 {
+    var visual = PageVisual(view.Slug);
+
     <PageTitle>@view.Title | آشیانه برق</PageTitle>
 
     <div class="site-container">
         <div class="site-page-head">
-            <nav class="site-breadcrumb" aria-label="مسیر">
-                <a href="/">خانه</a>
+            <nav class="site-breadcrumb" aria-label="@Language["aria.breadcrumb"]">
+                <a href="/">@Language["common.home"]</a>
                 <span class="sep">/</span>
                 <span class="current">@view.Title</span>
             </nav>
@@ -32,13 +36,21 @@ else
         {
             <div class="site-empty">
                 <i class="bi bi-file-earmark-text"></i>
-                <p>متنی برای این صفحه ثبت نشده است.</p>
+                <p>@Language["page.empty"]</p>
             </div>
         }
         else
         {
-            <div class="content-panel">
-                <ContentParagraphs Text="@view.Content" />
+            <div class="site-page-body @(visual is null ? "site-page-body--plain" : null)">
+                @if (visual is not null)
+                {
+                    <figure class="site-page-visual">
+                        <img src="@visual" alt="@view.Title" />
+                    </figure>
+                }
+                <div class="content-panel">
+                    <ContentParagraphs Text="@view.Content" />
+                </div>
             </div>
         }
     </div>
@@ -48,6 +60,17 @@ else
     [Parameter] public string Slug { get; set; } = string.Empty;
 
     private PageViewDto? view;
+
+    private static readonly Dictionary<string, string> Visuals = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["garranty"] = "/images/pages/warranty.svg",
+        ["warranty"] = "/images/pages/warranty.svg",
+        ["guarantee"] = "/images/pages/warranty.svg",
+        ["shipping"] = "/images/pages/shipping.svg",
+        ["faq"] = "/images/pages/faq.svg"
+    };
+
+    private static string? PageVisual(string slug) => Visuals.GetValueOrDefault(slug);
 
     protected override async Task OnParametersSetAsync()
         => view = await PageService.GetPublishedBySlugAsync(Slug);

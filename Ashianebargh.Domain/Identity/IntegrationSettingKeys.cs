@@ -5,7 +5,7 @@ namespace Ashianebargh.Domain.Identity;
 /// «ردیف دیتابیس ← appsettings ← پیش‌فرض داخلی» خوانده می‌شود، پس ادمین می‌تواند
 /// همه را از صفحهٔ تنظیمات عوض کند بدون اینکه appsettings دست بخورد.
 /// <para>
-/// انتخابِ درگاه (کدام provider) عمداً در appsettings می‌ماند (توپولوژی استقرار است،
+/// انتخابِ تأمین‌کننده (کدام provider) عمداً در appsettings می‌ماند (توپولوژی استقرار است،
 /// نه مقدار عملیاتی)؛ کلیدها و مقادیر عملیاتی اینجایند.
 /// </para>
 /// </summary>
@@ -22,14 +22,6 @@ public static class IntegrationSettingKeys
     public const string SmtpPassword = "integration:smtp-password";
     public const string SmtpFromAddress = "integration:smtp-from-address";
     public const string SmtpFromName = "integration:smtp-from-name";
-
-    // پرداخت (زرین‌پال) — appsettings: Payment:ZarinPal:*
-    public const string ZarinPalMerchantId = "integration:zarinpal-merchant-id";
-    public const string ZarinPalSandbox = "integration:zarinpal-sandbox";
-
-    // پرداخت (زیبال — درگاه دوم) — appsettings: Payment:Zibal:*
-    public const string ZibalMerchantId = "integration:zibal-merchant-id";
-    public const string ZibalSandbox = "integration:zibal-sandbox";
 
     // کپچا (Turnstile) — appsettings: Captcha:Turnstile:*
     public const string TurnstileSecretKey = "integration:turnstile-secret-key";

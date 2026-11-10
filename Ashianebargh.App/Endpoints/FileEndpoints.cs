@@ -37,6 +37,12 @@ public static class FileEndpoints
             var userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
             if (userId is null) return Results.Unauthorized();
 
+            // مسیر از سه بخشِ ورودیِ کاربر ساخته می‌شود؛ فقط شناسه‌های ساده مجازند.
+            // (ذخیره‌سازی هم مسیر نهایی را بررسی می‌کند، ولی ردکردن پیش از هر I/O
+            // جلوی ../ و کاراکترهای تزریقی در نام هدر Content-Disposition را می‌گیرد.)
+            if (!IsSafeSegment(ownerId) || !IsSafeSegment(fileType) || !IsSafeSegment(storageId))
+                return Results.NotFound();
+
             var isAdmin = user.IsInRole(Ashianebargh.Domain.Identity.Roles.Admin);
             if (!await access.CanReadAsync(userId, isAdmin, ownerId, fileType))
                 return Results.StatusCode(StatusCodes.Status403Forbidden);
@@ -62,5 +68,10 @@ public static class FileEndpoints
         });
 
         return app;
+
+        static bool IsSafeSegment(string value) =>
+            value.Length is > 0 and <= 100
+            && value != "." && value != ".."
+            && value.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' or '.');
     }
 }

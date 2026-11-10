@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Ashianebargh.Application.DTOs;
+using Ashianebargh.Application.Helpers;
 using Ashianebargh.Domain.Enums;
 using Ashianebargh.Domain.Identity;
 using Ashianebargh.Domain.Interfaces;
@@ -38,6 +39,7 @@ public class AuthService : IAuthService
     private readonly ILoginHistoryService _history;
     private readonly IHttpContextAccessor _httpContext;
     private readonly IApiTokenService _tokens;
+    private readonly IAshianebarghUnitOfWork _unitOfWork;
     private readonly string? _firstAdminPhoneNumber;
 
     public AuthService(
@@ -48,6 +50,7 @@ public class AuthService : IAuthService
         ILoginHistoryService history,
         IHttpContextAccessor httpContext,
         IApiTokenService tokens,
+        IAshianebarghUnitOfWork unitOfWork,
         IConfiguration configuration,
         ILogger<AuthService> logger)
     {
@@ -58,6 +61,7 @@ public class AuthService : IAuthService
         _history = history;
         _httpContext = httpContext;
         _tokens = tokens;
+        _unitOfWork = unitOfWork;
         _logger = logger;
         // شمارهٔ ادمین اول فقط از تنظیمات «Identity:FirstAdminPhoneNumber» خوانده می‌شود.
         // اگر تنظیم نباشد، هیچ شماره‌ای خودکار نقش Admin نمی‌گیرد.
@@ -145,7 +149,7 @@ public class AuthService : IAuthService
                 if (user is null)
                 {
                     _logger.LogWarning("User creation failed for {PhoneNumber}: {Errors}",
-                        phoneNumber, string.Join(" | ", createResult.Errors.Select(e => e.Description)));
+                        PiiMask.Phone(phoneNumber), string.Join(" | ", createResult.Errors.Select(e => e.Description)));
                     await _history.RecordAsync(null, phoneNumber, false, "Otp", ip, userAgent, "user-creation-failed");
                     return new OtpVerificationResult(false, false);
                 }
@@ -191,49 +195,95 @@ public class AuthService : IAuthService
         var user = await _userManager.FindByIdAsync(userId);
         if (user is null) return new ProfileUpdateResult(ProfileUpdateStatus.UserNotFound);
 
+        // همهٔ بررسی‌ها پیش از هر نوشتن انجام می‌شوند. قبلاً نام پیش از بررسی ایمیل/رمز
+        // ذخیره می‌شد و خطای بعدی، پروفایل را نیمه‌کاره رها می‌کرد.
+        string? trimmedName = null;
         if (!string.IsNullOrWhiteSpace(fullName))
         {
-            var trimmed = fullName.Trim();
-            if (trimmed.Length > 100)
+            trimmedName = fullName.Trim();
+            if (trimmedName.Length > 100)
                 return new ProfileUpdateResult(ProfileUpdateStatus.FullNameTooLong);
-
-            user.FullName = trimmed;
-            await _userManager.UpdateAsync(user);
         }
 
-        if (!string.IsNullOrWhiteSpace(email))
+        var normalizedEmail = string.IsNullOrWhiteSpace(email) ? null : email.Trim();
+        if (normalizedEmail is not null)
         {
-            var existingUser = await _userManager.FindByEmailAsync(email);
+            var existingUser = await _userManager.FindByEmailAsync(normalizedEmail);
             if (existingUser is not null && existingUser.Id != user.Id)
                 return new ProfileUpdateResult(ProfileUpdateStatus.EmailAlreadyExists);
-
-            var emailResult = await _userManager.SetEmailAsync(user, email);
-            if (!emailResult.Succeeded)
-            {
-                _logger.LogWarning("SetEmail failed for user {UserId}: {Errors}",
-                    userId, string.Join(" | ", emailResult.Errors.Select(e => e.Description)));
-                return new ProfileUpdateResult(ProfileUpdateStatus.EmailUpdateFailed);
-            }
         }
 
-        if (string.IsNullOrWhiteSpace(password)) return new ProfileUpdateResult(ProfileUpdateStatus.Success);
+        var setPassword = !string.IsNullOrWhiteSpace(password);
+        if (setPassword)
+        {
+            // نشست جانشین حق تعیین رمزِ کاربر را ندارد — وگرنه ادمین پشتیبانی می‌توانست
+            // برای همیشه راه ورود رمزی به حساب کاربر باز کند
+            if (_httpContext.HttpContext?.User.HasClaim(c => c.Type == ImpersonationClaims.Impersonator) == true)
+                return new ProfileUpdateResult(ProfileUpdateStatus.ImpersonationBlocked);
 
-        // نشست جانشین حق تعیین رمزِ کاربر را ندارد — وگرنه ادمین پشتیبانی می‌توانست
-        // برای همیشه راه ورود رمزی به حساب کاربر باز کند
-        if (_httpContext.HttpContext?.User.HasClaim(c => c.Type == ImpersonationClaims.Impersonator) == true)
-            return new ProfileUpdateResult(ProfileUpdateStatus.ImpersonationBlocked);
+            if (await _userManager.HasPasswordAsync(user))
+                return new ProfileUpdateResult(ProfileUpdateStatus.PasswordAlreadySet);
 
-        if (await _userManager.HasPasswordAsync(user))
-            return new ProfileUpdateResult(ProfileUpdateStatus.PasswordAlreadySet);
+            if (password != confirmPassword)
+                return new ProfileUpdateResult(ProfileUpdateStatus.PasswordMismatch);
+        }
 
-        if (password != confirmPassword)
-            return new ProfileUpdateResult(ProfileUpdateStatus.PasswordMismatch);
+        ProfileUpdateStatus? failure = null;
+        try
+        {
+            // سه عملیات Identity جدا (نام/ایمیل/رمز) در یک تراکنش: شکست هر کدام،
+            // بقیه را هم برمی‌گرداند تا کاربر با دادهٔ نیمه‌ذخیره روبه‌رو نشود.
+            await _unitOfWork.ExecuteInTransactionAsync(async () =>
+            {
+                if (trimmedName is not null)
+                {
+                    user.FullName = trimmedName;
+                    var updateResult = await _userManager.UpdateAsync(user);
+                    if (!updateResult.Succeeded)
+                    {
+                        _logger.LogWarning("Profile name update failed for user {UserId}: {Errors}",
+                            userId, string.Join(" | ", updateResult.Errors.Select(e => e.Description)));
+                        failure = ProfileUpdateStatus.ProfileUpdateFailed;
+                        throw new ProfileUpdateAbortedException();
+                    }
+                }
 
-        var token = await _userManager.GeneratePasswordResetTokenAsync(user);
-        var result = await _userManager.ResetPasswordAsync(user, token, password);
-        return result.Succeeded
-            ? new ProfileUpdateResult(ProfileUpdateStatus.Success)
-            : new ProfileUpdateResult(ProfileUpdateStatus.PasswordUpdateFailed);
+                if (normalizedEmail is not null)
+                {
+                    var emailResult = await _userManager.SetEmailAsync(user, normalizedEmail);
+                    if (!emailResult.Succeeded)
+                    {
+                        _logger.LogWarning("SetEmail failed for user {UserId}: {Errors}",
+                            userId, string.Join(" | ", emailResult.Errors.Select(e => e.Description)));
+                        failure = ProfileUpdateStatus.EmailUpdateFailed;
+                        throw new ProfileUpdateAbortedException();
+                    }
+                }
+
+                if (setPassword)
+                {
+                    var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+                    var passwordResult = await _userManager.ResetPasswordAsync(user, token, password!);
+                    if (!passwordResult.Succeeded)
+                    {
+                        failure = ProfileUpdateStatus.PasswordUpdateFailed;
+                        throw new ProfileUpdateAbortedException();
+                    }
+                }
+            });
+        }
+        catch (ProfileUpdateAbortedException)
+        {
+            _unitOfWork.ClearChangeTracker();
+            return new ProfileUpdateResult(failure!.Value);
+        }
+
+        return new ProfileUpdateResult(ProfileUpdateStatus.Success);
+    }
+
+    /// <summary>فقط برای شکستن تراکنشِ پروفایل پس از ثبت وضعیت خطا؛ بیرون نمی‌رود.</summary>
+    private sealed class ProfileUpdateAbortedException : Exception
+    {
     }
 
     private async Task<ApplicationUser?> FindByUserNameOrEmailAsync(string userName)
@@ -266,7 +316,7 @@ public class AuthService : IAuthService
         if (!result.Succeeded)
         {
             _logger.LogWarning("Password reset via OTP failed for {PhoneNumber}: {Errors}",
-                phoneNumber, string.Join(" | ", result.Errors.Select(e => e.Description)));
+                PiiMask.Phone(phoneNumber), string.Join(" | ", result.Errors.Select(e => e.Description)));
             return new PasswordResetResult(PasswordResetStatus.ResetFailed, user.Id);
         }
 

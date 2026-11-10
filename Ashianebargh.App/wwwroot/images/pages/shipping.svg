@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 360" role="img" aria-label="ارسال و تحویل سفارش">
+  <rect width="480" height="360" rx="28" fill="#eef2f8"/>
+  <circle cx="240" cy="176" r="128" fill="#e4ebf7"/>
+  <path d="M58 268h364" stroke="#c6d5ec" stroke-width="7" stroke-linecap="round"/>
+  <path d="M74 292h76M184 292h52M270 292h96" stroke="#d5e0f0" stroke-width="6" stroke-linecap="round"/>
+  <rect x="78" y="136" width="196" height="112" rx="12" fill="#ffffff" stroke="#0b345b" stroke-width="8"/>
+  <rect x="78" y="136" width="196" height="30" rx="12" fill="#0b345b"/>
+  <rect x="104" y="186" width="62" height="12" rx="6" fill="#e4202a"/>
+  <rect x="104" y="208" width="104" height="10" rx="5" fill="#c6d5ec"/>
+  <path d="M274 180h58l44 44v24h-102z" fill="#e4202a"/>
+  <path d="M296 192h28l28 28h-56z" fill="#ffffff"/>
+  <circle cx="146" cy="258" r="24" fill="#0b345b"/>
+  <circle cx="146" cy="258" r="10" fill="#ffffff"/>
+  <circle cx="330" cy="258" r="24" fill="#0b345b"/>
+  <circle cx="330" cy="258" r="10" fill="#ffffff"/>
+  <rect x="118" y="92" width="52" height="42" rx="6" fill="#e4202a"/>
+  <path d="M118 106h52M144 92v42" stroke="#ffffff" stroke-width="4"/>
+  <rect x="180" y="106" width="42" height="34" rx="5" fill="#ffffff" stroke="#0b345b" stroke-width="5"/>
+  <path d="M180 118h42" stroke="#0b345b" stroke-width="5"/>
+  <path d="M40 160h22M36 184h16M40 208h22" stroke="#9db4d6" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="402" cy="98" r="8" fill="#e4202a"/>
+  <circle cx="70" cy="104" r="6" fill="#9db4d6"/>
+</svg>

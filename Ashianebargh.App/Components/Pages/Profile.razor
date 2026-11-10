@@ -161,6 +161,7 @@ else
             {
                 errorMessage = result.Status switch
                 {
+                    ProfileUpdateStatus.ProfileUpdateFailed => "ذخیرهٔ اطلاعات پروفایل ناموفق بود.",
                     ProfileUpdateStatus.EmailAlreadyExists => "این ایمیل قبلاً توسط کاربر دیگری استفاده شده است.",
                     ProfileUpdateStatus.EmailUpdateFailed => "به‌روزرسانی ایمیل ناموفق بود.",
                     ProfileUpdateStatus.PasswordAlreadySet => "رمز عبور قبلاً تنظیم شده است.",

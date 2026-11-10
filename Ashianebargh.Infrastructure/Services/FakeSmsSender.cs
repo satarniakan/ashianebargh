@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using Ashianebargh.Application.Helpers;
 using Ashianebargh.Domain.Interfaces;
 
 namespace Ashianebargh.Infrastructure.Services;
@@ -23,11 +24,13 @@ public class FakeSmsSender : ISmsSender
     {
         if (_logMessageBody)
         {
-            _logger.LogWarning("=== SMS SIMULATION === To: {PhoneNumber} | Message: {Message}", phoneNumber, message);
+            _logger.LogWarning("=== SMS SIMULATION === To: {PhoneNumber} | Message: {Message}",
+                PiiMask.Phone(phoneNumber), message);
         }
         else
         {
-            _logger.LogWarning("SMS to {PhoneNumber} was NOT sent: no SMS provider is configured.", phoneNumber);
+            _logger.LogWarning("SMS to {PhoneNumber} was NOT sent: no SMS provider is configured.",
+                PiiMask.Phone(phoneNumber));
         }
 
         return Task.CompletedTask;

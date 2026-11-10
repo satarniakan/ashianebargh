@@ -90,7 +90,8 @@ else
     private string? errorMessage;
     private bool isSaving;
 
-    protected override async Task OnInitializedAsync()
+    // پارامتر مسیر هنگام OnInitializedAsync هنوز مقدار ندارد در ناوبری سمت کلاینت
+    protected override async Task OnParametersSetAsync()
     {
         allRoles = await UserAdminService.GetAllRolesAsync();
         user = await UserAdminService.GetUserAsync(UserId);

@@ -2,7 +2,7 @@
 
 این ریپو پایهٔ آمادهٔ پروژه‌هاست: هویت و ورود (OTP + رمز)،
 مدیریت کاربران و نقش‌ها، مجوزها، منوی داده‌محور، لاگ رویدادها، اعلان‌ها (کارتابل + وب‌پوش)،
-صف پیام (Outbox)، توکن API موبایل، پرداخت، تنظیمات قابل‌ویرایش،
+صف پیام (Outbox)، توکن API موبایل، تنظیمات قابل‌ویرایش،
 ابزارهای فارسی‌سازی و خروجی/ورودی اکسل و PDF.
 
 ## پیش‌نیازها
@@ -75,8 +75,9 @@ dotnet test MyProject/MyProject.Tests/MyProject.Tests.csproj
 (با `dotnet run --project Ashianebargh.App` که در گام ۳ اجرا کردید).
 
 جدول‌های پایه (کاربران، نقش‌ها، OTP، اعلان‌ها، لاگ‌ها، Outbox) با `MigrateAsync`
-هنگام startup خودکار ساخته می‌شوند. مرورگر را روی همان آدرسی که در ترمینال چاپ شد
-باز کنید. برای اینکه خودتان ادمین شوید، قبلاً `Identity:FirstAdminPhoneNumber` را
+هنگام startup خودکار ساخته می‌شوند. اگر می‌خواهید مایگریشن‌ها کنترل‌شده و جدا
+از استارتاپ اجرا شوند (مثلاً در استقرار چندنمونه‌ای)، `Database:AutoMigrate` را
+`false` کنید. برای اینکه خودتان ادمین شوید، قبلاً `Identity:FirstAdminPhoneNumber` را
 روی شمارهٔ خودتان گذاشته باشید؛ آن شماره با اولین ورودِ OTP نقش «ادمین» می‌گیرد
 و همهٔ کاربران تازه نقش «کاربر» می‌گیرند.
 
@@ -127,7 +128,6 @@ dotnet ef migrations add <Name> --project Ashianebargh.App --startup-project Ash
 | `/profile` | پروفایل و تعیین رمز | همهٔ کاربران واردشده |
 | `/admin/users` | مدیریت افراد: درج، ویرایش، حذف و نقش‌ها | ادمین |
 | `/admin/settings` | تنظیمات سامانه و قالب پیام‌ها | ادمین |
-| `/payment-result` | نتیجهٔ برگشت از درگاه | همگانی |
 
 ارسال پیام: هر رویداد دامنه می‌تواند هم‌زمان به کارتابل اعلان‌ها + صف ایمیل/پیامک/پوش
 (Outbox؛ ارسال واقعی با `OutboxProcessor` بر اساس `Email:Smtp:*` و `Sms:Provider`) برود.
@@ -157,10 +157,10 @@ dotnet new install .
 
 | مسیر | نقش |
 |---|---|
-| `Ashianebargh.Domain` | هویت (`ApplicationUser`)، مجوز (`Permissions` فقط `ClaimType` دارد)، نقش‌های پایه + `IPermissionCatalog`، قراردادهای زیرساخت (`IFileStorage`، `ISmsSender`، `IEmailSender`، `IPaymentGateway`، `ICaptchaValidator`)، انتیتی‌های پایه (AuditLog، OtpCode، OtpThrottle، OutboxMessage، Notification، Setting، Payment، ApiToken، LoginHistory، PushSubscription)، `IAshianebarghUnitOfWork`، جست‌وجوی فارسی (`PersianSearch`) |
-| `Ashianebargh.Application` | سرویس‌های پایه (Auth، Otp، Audit، Permission، UserAdmin، Notification، Outbox، ApiToken، LoginHistory، Setting، NumberSeries، Payment، Push، Impersonation) + Helpers فارسی + Exports اکسل/PDF + ایمپورت اکسل + ترجمهٔ یکتای خطا (`ExceptionTranslator`) + کارهای تکرارشونده (`IRecurringJob`) |
-| `Ashianebargh.Infrastructure` | `AshianebarghDbContext` (ماژولار با `IAshianebarghModule`) + `AshianebarghUnitOfWork` (تراکنش واقعی)، `RoleSeeder`، فرستنده‌های پیامک/ایمیل، درگاه زرین‌پال، Turnstile، وب‌پوش VAPID — بدون هیچ مایگریشن (مال میزبان است) |
-| `Ashianebargh.App` | **تنها پروژهٔ اجرایی و تنها پروژهٔ وب (startup)** — همهٔ لایهٔ وب اینجاست: صفحات ورود/OTP/پروفایل/خانه/نشست‌ها/ادمین/تنظیمات/نتیجهٔ پرداخت، `MainLayout` (بنر جانشینی)، `NavMenu` داده‌محور (`INavProvider`)، `Routes`، کامپوننت‌های `Shared/App*` + دکمهٔ وب‌پوش + زیرساخت اجرا (`AshianebarghSetup`، endpointها، سرویس‌های پس‌زمینه)؛ مایگریشن‌ها (`Migrations/`) و فکتوری design-time هم اینجاست |
+| `Ashianebargh.Domain` | هویت (`ApplicationUser`)، مجوز (`Permissions` فقط `ClaimType` دارد)، نقش‌های پایه + `IPermissionCatalog`، قراردادهای زیرساخت (`IFileStorage`، `ISmsSender`، `IEmailSender`، `ICaptchaValidator`)، انتیتی‌های پایه (AuditLog، OtpCode، OtpThrottle، OutboxMessage، Notification، Setting، ApiToken، LoginHistory، PushSubscription)، `IAshianebarghUnitOfWork`، جست‌وجوی فارسی (`PersianSearch`) |
+| `Ashianebargh.Application` | سرویس‌های پایه (Auth، Otp، Audit، Permission، UserAdmin، Notification، Outbox، ApiToken، LoginHistory، Setting، NumberSeries، Push، Impersonation) + Helpers فارسی + Exports اکسل/PDF + ایمپورت اکسل + ترجمهٔ یکتای خطا (`ExceptionTranslator`) + کارهای تکرارشونده (`IRecurringJob`) |
+| `Ashianebargh.Infrastructure` | `AshianebarghDbContext` (ماژولار با `IAshianebarghModule`) + `AshianebarghUnitOfWork` (تراکنش واقعی)، `RoleSeeder`، فرستنده‌های پیامک/ایمیل، Turnstile، وب‌پوش VAPID — بدون هیچ مایگریشن (مال میزبان است) |
+| `Ashianebargh.App` | **تنها پروژهٔ اجرایی و تنها پروژهٔ وب (startup)** — همهٔ لایهٔ وب اینجاست: صفحات ورود/OTP/پروفایل/خانه/نشست‌ها/ادمین/تنظیمات، `MainLayout` (بنر جانشینی)، `NavMenu` داده‌محور (`INavProvider`)، `Routes`، کامپوننت‌های `Shared/App*` + دکمهٔ وب‌پوش + زیرساخت اجرا (`AshianebarghSetup`، endpointها، سرویس‌های پس‌زمینه)؛ مایگریشن‌ها (`Migrations/`) و فکتوری design-time هم اینجاست |
 
 ## خطاهای پرتکرار
 
@@ -334,7 +334,20 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build -d
 ```
 
 تفاوت‌ها با حالت توسعه: محیط `Production`، رمز `sa` از `.env` (نه داخل فایل)،
-پورت SQL به بیرون بسته و ری‌استارت خودکار.
+پورت SQL و اپ به بیرون بسته و ری‌استارت خودکار.
+
+در Production سه مقدار **اجباری** است و استارتاپ بدون آن‌ها با پیام روشن متوقف می‌شود
+(تا استقرار تازه نه بدون کپچا باز بماند و نه در بن‌بست «کلید خالی ← ورود ناممکن» بیفتد):
+کلیدهای Turnstile (`APP_TURNSTILE_SITE_KEY` و `APP_TURNSTILE_SECRET_KEY`) و
+`APP_SECURITY_PEPPER`. این‌ها را در `.env` بگذارید؛ چرخش بعدی از صفحهٔ تنظیمات مجاز است
+به شرطی که env همچنان مقدار معتبر نگه دارد.
+
+TLS توسط سرویس `proxy` (Caddy با HTTPS خودکار) خاتمه می‌یود؛ `APP_DOMAIN` را در `.env`
+با دامنهٔ عمومی خود پر کنید و پورت‌های 80/443 را باز بگذارید. اپ فقط HTTP داخلی می‌دهد و
+هدرهای forwarded پروکسی را می‌پذیرد (`ForwardedHeaders:TrustAllProxies`)، چون تنها همان
+پروکسی به آن می‌رسد. اگر TLS را بیرون از compose خاتمه می‌دهید، سرویس `proxy` را حذف و
+پروکسی خود را به `web:8080` هدایت کنید.
+
 بکاپ دیتابیس را با Agent/تسک زمان‌بندی سرور بگیرید؛ برای ریستور، `docs/database.sql`
 و دستورهای اول همان فایل را ببینید.
 
@@ -344,13 +357,12 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build -d
 ولی مقدار مؤثر هر کلید عملیاتی از صفحهٔ **مدیریت ← تنظیمات** (`/admin/settings`) هم
 قابل تغییر است، با ترتیب: **ردیف دیتابیس ← appsettings ← پیش‌فرض**.
 کلیدهای API و رمزها در دیتابیس **رمزنگاری‌شده** ذخیره و هرگز نمایش داده نمی‌شوند.
-انتخابِ درگاه (`Fake`/`Kavenegar`/`ZarinPal`/…) در `appsettings` می‌ماند.
+انتخابِ تأمین‌کننده (`Fake`/`Kavenegar`/`Turnstile`/…) در `appsettings` می‌ماند.
 
 | بخش | کلیدها | توضیح |
 |---|---|---|
 | `Sms` | `Provider`: `Fake`/`Kavenegar` | پیامک نمایشی (لاگ) یا واقعی |
 | `Email:Smtp` | `Host`، `Port`، … | `Host` خالی یعنی ارسال با خطا در Outbox ثبت می‌شود |
-| `Payment` | `Provider`: `Fake`/`ZarinPal` | شروع: `POST /api/v1/payments`؛ برگشت: `/payments/callback` |
 | `Captcha` | `Provider`: `Turnstile`/`Fake`/خالی | کپچای مسیر درخواست OTP؛ ویجت لاگین خودکار می‌آید |
 | `Push:Vapid` | `Subject`، `PublicKey`، `PrivateKey` | وب‌پوش؛ ساخت کلید: `npx web-push generate-vapid-keys` |
 | `ApiTokens` | `LifetimeDays` (پیش‌فرض ۱۸۰) | عمر توکن موبایل؛ ورود موبایل با OTP (`POST /api/v1/auth/otp/verify`) یا با رمز (`POST /api/v1/auth/login` — مسیر جایگزین وقتی پیامک قطع است) |
@@ -361,7 +373,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build -d
 `INavProvider` (منو)، `ISettingCatalog` (تنظیمات قابل‌ویرایش)، `IAshianebarghModule`
 (جدول‌های EF)، `IDomainUnitOfWork : IAshianebarghUnitOfWork` (ریپوهای دامنه با همان تراکنش)،
 `IRecurringJob` (کار دوره‌ای)، `INumberSeries` (شمارهٔ سند)،
-`ExcelImporter` (ایمپورت با خطای سطری)، `IPaymentGateway` (درگاه جدید).
+`ExcelImporter` (ایمپورت با خطای سطری).
 
 مستندات خودکار API موبایل فقط در Development است: `/openapi/v1.json`.
 

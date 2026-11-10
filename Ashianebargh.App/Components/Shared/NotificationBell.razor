@@ -3,6 +3,7 @@
    (نه از سرویس مدار) تا هم‌روندی DbContext با صفحات تعاملی پیش نیاید *@
 @rendermode InteractiveServer
 @using Ashianebargh.Application.DTOs
+@using Ashianebargh.Application.Helpers
 @using Ashianebargh.Domain.Enums
 @inject IJSRuntime JS
 @inject NavigationManager Nav
@@ -44,7 +45,7 @@
                 {
                     @foreach (var n in items)
                     {
-                        <a href="@(n.LinkUrl ?? "#")" class="notif-item @(n.IsRead ? "" : "is-unread")"
+                        <a href="@(SafeUrl.Normalize(n.LinkUrl) ?? "#")" class="notif-item @(n.IsRead ? "" : "is-unread")"
                            @onclick="() => ItemClicked(n)">
                             <span class="notif-icon"><i class="bi @IconFor(n.Type)"></i></span>
                             <span class="notif-content">
@@ -88,7 +89,7 @@
         if (diff.TotalMinutes < 60) return $"{(int)diff.TotalMinutes} دقیقه پیش";
         if (diff.TotalHours < 24) return $"{(int)diff.TotalHours} ساعت پیش";
         if (diff.TotalDays < 7) return $"{(int)diff.TotalDays} روز پیش";
-        return utc.ToString("yyyy/MM/dd");
+        return utc.ToPersianDate();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -150,10 +151,11 @@
             UnreadCount = Math.Max(0, UnreadCount - 1);
             n.IsRead = true;
         }
-        if (n.LinkUrl is not null)
+        var link = SafeUrl.Normalize(n.LinkUrl);
+        if (link is not null)
         {
             open = false;
-            Nav.NavigateTo(n.LinkUrl);
+            Nav.NavigateTo(link);
         }
         StateHasChanged();
     }
