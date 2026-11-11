@@ -14,7 +14,7 @@
     <PackageVersion Include="MailKit" Version="4.18.1" />
 
     <!-- خروجی اکسل/PDF -->
-    <PackageVersion Include="ClosedXML" Version="0.104.2" />
+    <PackageVersion Include="ClosedXML" Version="0.105.1" />
     <PackageVersion Include="QuestPDF" Version="2026.9.1" />
 
     <!-- Identity / EF Core — همه روی یک نسخه‌ی وصله -->
