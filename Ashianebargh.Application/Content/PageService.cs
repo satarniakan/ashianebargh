@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Ashianebargh.Domain.Content;
 using Ashianebargh.Domain.Exceptions;
+using System.Globalization;
 
 namespace Ashianebargh.Application.Content;
 
@@ -19,11 +20,20 @@ public interface IPageService
 
 public sealed class PageService(IContentUnitOfWork uow) : IPageService
 {
+    private bool IsEnglish => CultureInfo.CurrentUICulture.TwoLetterISOLanguageName
+        .Equals("en", StringComparison.OrdinalIgnoreCase);
     public Task<List<PageListItemDto>> GetAllAsync() =>
         uow.Content.Pages
             .OrderBy(p => p.SortOrder).ThenBy(p => p.Title)
             .Select(p => new PageListItemDto(
-                p.Id, p.Title, p.Slug, p.IsPublished, p.ShowInMenu, p.SortOrder, p.CreatedAt))
+                p.Id,
+                p.Title,
+                p.Translations.FirstOrDefault(t => t.LanguageCode == "en")!.Title,
+                p.Slug,
+                p.IsPublished,
+                p.ShowInMenu,
+                p.SortOrder,
+                p.CreatedAt))
             .ToListAsync();
 
     public Task<PageEditDto?> GetAsync(int id) =>
@@ -33,8 +43,10 @@ public sealed class PageService(IContentUnitOfWork uow) : IPageService
             {
                 Id = p.Id,
                 Title = p.Title,
+                TitleEn = p.Translations.FirstOrDefault(t => t.LanguageCode == "en")!.Title,
                 Slug = p.Slug,
                 Content = p.Content,
+                ContentEn = p.Translations.FirstOrDefault(t => t.LanguageCode == "en")!.Content,
                 IsPublished = p.IsPublished,
                 ShowInMenu = p.ShowInMenu,
                 SortOrder = p.SortOrder
@@ -49,8 +61,10 @@ public sealed class PageService(IContentUnitOfWork uow) : IPageService
             {
                 Id = p.Id,
                 Title = p.Title,
+                TitleEn = p.Translations.FirstOrDefault(t => t.LanguageCode == "en")!.Title,
                 Slug = p.Slug,
                 Content = p.Content,
+                ContentEn = p.Translations.FirstOrDefault(t => t.LanguageCode == "en")!.Content,
                 IsPublished = p.IsPublished,
                 ShowInMenu = p.ShowInMenu,
                 SortOrder = p.SortOrder
@@ -60,6 +74,7 @@ public sealed class PageService(IContentUnitOfWork uow) : IPageService
         return existing ?? new PageEditDto
         {
             Title = "درباره ما",
+            TitleEn = "About Us",
             Slug = Page.AboutSlug,
             IsPublished = true
         };
@@ -85,7 +100,9 @@ public sealed class PageService(IContentUnitOfWork uow) : IPageService
         Page entity;
         if (dto.Id > 0)
         {
-            entity = await uow.Content.Pages.FirstOrDefaultAsync(p => p.Id == dto.Id)
+            entity = await uow.Content.Pages
+                .Include(p => p.Translations)
+                .FirstOrDefaultAsync(p => p.Id == dto.Id)
                 ?? throw new NotFoundException("صفحه", dto.Id);
 
             if (entity.Slug == Page.AboutSlug)
@@ -104,6 +121,24 @@ public sealed class PageService(IContentUnitOfWork uow) : IPageService
         entity.ShowInMenu = dto.ShowInMenu;
         entity.SortOrder = dto.SortOrder;
 
+        var enTranslation = entity.Translations.FirstOrDefault(t => t.LanguageCode == "en");
+        if (enTranslation is null)
+        {
+            enTranslation = new PageTranslation
+            {
+                PageId = entity.Id,
+                LanguageCode = "en",
+                Title = dto.TitleEn,
+                Content = dto.ContentEn
+            };
+            entity.Translations.Add(enTranslation);
+        }
+        else
+        {
+            enTranslation.Title = dto.TitleEn;
+            enTranslation.Content = dto.ContentEn;
+        }
+
         await uow.CompleteAsync();
         return entity.Id;
     }
@@ -112,7 +147,9 @@ public sealed class PageService(IContentUnitOfWork uow) : IPageService
     {
         var title = string.IsNullOrWhiteSpace(dto.Title) ? "درباره ما" : dto.Title.Trim();
 
-        var entity = await uow.Content.Pages.FirstOrDefaultAsync(p => p.Slug == Page.AboutSlug);
+        var entity = await uow.Content.Pages
+            .Include(p => p.Translations)
+            .FirstOrDefaultAsync(p => p.Slug == Page.AboutSlug);
         if (entity is null)
         {
             entity = new Page { Slug = Page.AboutSlug };
@@ -124,6 +161,24 @@ public sealed class PageService(IContentUnitOfWork uow) : IPageService
         entity.IsPublished = dto.IsPublished;
         entity.ShowInMenu = false;
         entity.SortOrder = 0;
+
+        var enTranslation = entity.Translations.FirstOrDefault(t => t.LanguageCode == "en");
+        if (enTranslation is null)
+        {
+            enTranslation = new PageTranslation
+            {
+                PageId = entity.Id,
+                LanguageCode = "en",
+                Title = dto.TitleEn,
+                Content = dto.ContentEn
+            };
+            entity.Translations.Add(enTranslation);
+        }
+        else
+        {
+            enTranslation.Title = dto.TitleEn;
+            enTranslation.Content = dto.ContentEn;
+        }
 
         await uow.CompleteAsync();
     }
@@ -144,18 +199,33 @@ public sealed class PageService(IContentUnitOfWork uow) : IPageService
         uow.Content.Pages.AsNoTracking()
             .Where(p => p.IsPublished && p.ShowInMenu && p.Slug != Page.AboutSlug)
             .OrderBy(p => p.SortOrder).ThenBy(p => p.Title)
-            .Select(p => new PageMenuItemDto(p.Title, p.Slug))
+            .Select(p => new PageMenuItemDto(
+                p.Title,
+                p.Translations.FirstOrDefault(t => t.LanguageCode == "en")!.Title,
+                p.Slug))
             .ToListAsync();
 
     public Task<PageViewDto?> GetPublishedBySlugAsync(string slug) =>
         uow.Content.Pages.AsNoTracking()
             .Where(p => p.Slug == slug && p.IsPublished)
-            .Select(p => new PageViewDto(p.Title, p.Slug, p.Content, p.UpdatedAt))
+            .Select(p => new PageViewDto(
+                p.Title,
+                p.Translations.FirstOrDefault(t => t.LanguageCode == "en")!.Title,
+                p.Slug,
+                p.Content,
+                p.Translations.FirstOrDefault(t => t.LanguageCode == "en")!.Content,
+                p.UpdatedAt))
             .FirstOrDefaultAsync();
 
     public Task<PageViewDto?> GetAboutAsync() =>
         uow.Content.Pages.AsNoTracking()
             .Where(p => p.Slug == Page.AboutSlug && p.IsPublished)
-            .Select(p => new PageViewDto(p.Title, p.Slug, p.Content, p.UpdatedAt))
+            .Select(p => new PageViewDto(
+                p.Title,
+                p.Translations.FirstOrDefault(t => t.LanguageCode == "en")!.Title,
+                p.Slug,
+                p.Content,
+                p.Translations.FirstOrDefault(t => t.LanguageCode == "en")!.Content,
+                p.UpdatedAt))
             .FirstOrDefaultAsync();
 }

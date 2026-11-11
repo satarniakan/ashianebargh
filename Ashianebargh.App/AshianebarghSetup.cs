@@ -11,6 +11,7 @@ using Ashianebargh.Infrastructure.Data;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
+using Ashianebargh.Application.Content;
 using Ashianebargh.Application.Jobs;
 using Ashianebargh.App.Authentication;
 using Ashianebargh.App.Authorization;
@@ -56,6 +57,14 @@ public static class AshianebarghSetup
         // Health Checks UI (AspNetCore.HealthChecks.UI 9.x) با EF Core 10 باینری‌سازگار
         // نیست (MissingMethodException هنگام استارتاپ). تا انتشار نسخهٔ 10، فقط /health
         // فعال است؛ داشبورد UI با پکیج سازگار دوباره اضافه می‌شود.
+
+        // سرویس ایمپورت محصولات از tksterminal.com
+        services.AddHttpClient("tksimport", client =>
+        {
+            client.BaseAddress = new Uri("https://tksterminal.com/");
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
+        services.AddScoped<ITksImportService, TksImportService>();
 
         // Feature Flags (Microsoft.FeatureManagement) — بخش‌های اختیاری را بدون تغییر کد روشن/خاموش کنید
         services.AddFeatureManagement();

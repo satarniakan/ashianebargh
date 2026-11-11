@@ -11,6 +11,7 @@ public interface IContentRepository
     IQueryable<Category> Categories { get; }
     IQueryable<Tag> Tags { get; }
     IQueryable<Product> Products { get; }
+    IQueryable<ProductFile> ProductFiles { get; }
     IQueryable<Page> Pages { get; }
     IQueryable<ContactInfo> ContactInfos { get; }
     IQueryable<ContactMessage> ContactMessages { get; }

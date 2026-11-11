@@ -13,4 +13,7 @@ public class Page : AuditableEntity
     public bool IsPublished { get; set; } = true;
     public bool ShowInMenu { get; set; }
     public int SortOrder { get; set; }
+
+    /// <summary>ترجمه‌های این صفحه به زبان‌های دیگر.</summary>
+    public ICollection<PageTranslation> Translations { get; set; } = new List<PageTranslation>();
 }

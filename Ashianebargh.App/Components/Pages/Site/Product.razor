@@ -102,7 +102,7 @@ else
                     </div>
                 </div>
 
-                <h2 class="site-subhead">@Language["detail.specs"]</h2>
+                <h2 class="site-subhead">@Language["detail.summary"]</h2>
                 <div class="site-table-wrap">
                     <table class="site-table">
                         <thead>
@@ -134,10 +134,45 @@ else
 
                 @if (!string.IsNullOrWhiteSpace(product.Description))
                 {
-                    <h2 class="site-subhead">@Language["detail.description"]</h2>
-                    <div class="site-detail-desc">
-                        <ContentParagraphs Text="@product.Description" />
-                    </div>
+                    <h2 class="site-subhead">@Language["detail.specs"]</h2>
+                    @if (product.Description.TrimStart().StartsWith("<table", StringComparison.OrdinalIgnoreCase))
+                    {
+                        <div class="site-table-wrap">
+                            <div class="site-specs-wrap">
+                                @((MarkupString)product.Description)
+                            </div>
+                            <p class="site-specs-hint">
+                                <i class="bi bi-arrow-left-right"></i>
+                                @(Language.IsEnglish ? "Swipe the table horizontally to see all columns." : "برای دیدن همهٔ ستون‌ها، جدول را افقی بکشید.")
+                            </p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="site-detail-desc">
+                            <ContentParagraphs Text="@product.Description" />
+                        </div>
+                    }
+                }
+
+                @if (product.Files.Count > 0)
+                {
+                    <h2 class="site-subhead">@Language["detail.files"]</h2>
+                    <ul class="site-files">
+                        @foreach (var f in product.Files)
+                        {
+                            <li class="site-file">
+                                <span class="site-file-icon"><i class="bi bi-file-earmark-pdf"></i></span>
+                                <span class="site-file-info">
+                                    <span class="site-file-name" dir="ltr">@f.FileName</span>
+                                    <span class="site-file-size">@Language.FileSize(f.SizeBytes)</span>
+                                </span>
+                                <a class="site-file-btn" href="/media/product-files/@f.Id/download">
+                                    <i class="bi bi-download"></i>@Language["detail.download"]
+                                </a>
+                            </li>
+                        }
+                    </ul>
                 }
             </section>
         </div>

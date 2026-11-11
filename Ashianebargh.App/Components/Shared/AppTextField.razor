@@ -5,13 +5,13 @@
 <div class="@WrapperClass">
     @if (!string.IsNullOrEmpty(Label))
     {
-        <label class="form-label">@Label @if (IsRequired) { <span class="text-danger" title="الزامی">*</span> }</label>
+        <label class="form-label" for="@InputId">@Label @if (IsRequired) { <span class="text-danger" title="الزامی">*</span> }</label>
     }
 
     @if (CascadedEditContext is not null)
     {
         @* داخل EditForm: ورودی InputBase با پشتیبانی اعتبارسنجی *@
-        <InputText @attributes="ExtraAttributes" class="@CssClass" Value="@Value" ValueChanged="@ValueChanged"
+        <InputText id="@InputId" @attributes="ExtraAttributes" class="@CssClass" Value="@Value" ValueChanged="@ValueChanged"
                    ValueExpression="@ValueExpression" placeholder="@Placeholder" disabled="@Disabled" />
         @if (ValueExpression is not null)
         {
@@ -21,7 +21,7 @@
     else
     {
         @* بیرون EditForm (مثل Profile): ورودی ساده — InputBase بدون EditContext/Expression کرش می‌کند *@
-        <input @attributes="ExtraAttributes" class="@CssClass" value="@Value" @oninput="OnInput"
+        <input id="@InputId" @attributes="ExtraAttributes" class="@CssClass" value="@Value" @oninput="OnInput"
                placeholder="@Placeholder" disabled="@Disabled" />
     }
 
@@ -38,6 +38,9 @@
 @code {
     [CascadingParameter]
     private EditContext? CascadedEditContext { get; set; }
+
+    /// <summary>شناسهٔ ورودی برای اتصال label (خواندن صفحه‌خوانِ صفحه).</summary>
+    private readonly string InputId = $"f{Guid.NewGuid():N}";
 
     [Parameter] public string? Label { get; set; }
     [Parameter] public string? Placeholder { get; set; }

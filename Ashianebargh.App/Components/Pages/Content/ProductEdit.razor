@@ -114,6 +114,42 @@ else
                 </div>
 
                 <div class="card-panel mt-3">
+                    <h5 class="mb-3">فایل‌های پیوست (PDF)</h5>
+                    @if (model?.Files.Count > 0)
+                    {
+                        <ul class="list-group mb-3">
+                            @foreach (var f in model!.Files)
+                            {
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span class="small">@f.FileName</span>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => DeleteFileAsync(f.Id)">حذف</button>
+                                </li>
+                            }
+                        </ul>
+                    }
+                    @if (pendingFiles.Count > 0)
+                    {
+                        <ul class="list-group mb-3">
+                            @foreach (var f in pendingFiles)
+                            {
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span class="small">@f.FileName <span class="text-body-secondary">(پس از ذخیرهٔ محصول پیوست می‌شود)</span></span>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => RemovePendingFileAsync(f.StorageId)">حذف</button>
+                                </li>
+                            }
+                        </ul>
+                    }
+                    <label class="btn btn-sm btn-outline-primary mb-0" title="PDF">
+                        <i class="bi bi-upload me-1"></i>پیوست فایل
+                        <InputFile accept=".pdf" OnChange="UploadFileAsync" style="display:none;" />
+                    </label>
+                    @if (uploadingFile)
+                    {
+                        <div class="form-text mt-2">در حال بارگذاری…</div>
+                    }
+                </div>
+
+                <div class="card-panel mt-3">
                     <div class="d-flex gap-2">
                         <button type="submit" class="btn btn-primary" disabled="@saving">@(saving ? "در حال ذخیره…" : "ذخیره")</button>
                         <a href="/content/products" class="btn btn-outline-secondary">انصراف</a>
@@ -131,8 +167,12 @@ else
     private List<CategoryListItemDto> categories = new();
     private List<TagListItemDto> tags = new();
     private string? pendingImageId;
+    private readonly List<PendingFile> pendingFiles = new();
     private bool saving;
     private bool uploading;
+    private bool uploadingFile;
+
+    private sealed record PendingFile(string StorageId, string FileName, string ContentType, long SizeBytes);
 
     private string? ImagePreviewId => pendingImageId ?? model?.MainImageStorageId;
 
@@ -227,6 +267,73 @@ else
         }
     }
 
+    private async Task UploadFileAsync(InputFileChangeEventArgs e)
+    {
+        if (model is null) return;
+        uploadingFile = true;
+        try
+        {
+            var file = e.File;
+            if (model.Id > 0)
+            {
+                // محصول موجود: فایل بلافاصله به آن وصل می‌شود
+                await using var stream = file.OpenReadStream(20 * 1024 * 1024);
+                var dto = await Service.AddFileAsync(model.Id, stream, file.Name, file.ContentType);
+                model.Files.Add(dto);
+            }
+            else
+            {
+                // محصول جدید: فایل در فضای ذخیره‌سازی می‌نشیند و بعد از ذخیرهٔ محصول وصل می‌شود
+                await using var stream = file.OpenReadStream(20 * 1024 * 1024);
+                var storageId = await Storage.SaveAsync(
+                    ContentStorage.Owner, ContentStorage.ProductFileType,
+                    stream, file.Name, file.ContentType);
+                pendingFiles.Add(new PendingFile(storageId, file.Name, file.ContentType, file.Size));
+            }
+
+            ToastService.ShowSuccess("فایل بارگذاری شد.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError(ErrorMessageHelper.ToUserMessage(ex));
+        }
+        finally
+        {
+            uploadingFile = false;
+        }
+    }
+
+    private async Task RemovePendingFileAsync(string storageId)
+    {
+        var pending = pendingFiles.FirstOrDefault(f => f.StorageId == storageId);
+        if (pending is null) return;
+
+        pendingFiles.RemoveAll(f => f.StorageId == storageId);
+        try
+        {
+            await Storage.DeleteAsync(ContentStorage.Owner, ContentStorage.ProductFileType, storageId);
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError(ErrorMessageHelper.ToUserMessage(ex));
+        }
+    }
+
+    private async Task DeleteFileAsync(int fileId)
+    {
+        if (model is null) return;
+        try
+        {
+            await Service.DeleteFileAsync(fileId);
+            model.Files.RemoveAll(f => f.Id == fileId);
+            ToastService.ShowSuccess("فایل حذف شد.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError(ErrorMessageHelper.ToUserMessage(ex));
+        }
+    }
+
     private async Task SaveAsync()
     {
         if (model is null) return;
@@ -236,6 +343,14 @@ else
             var id = await Service.SaveAsync(model);
             if (pendingImageId is not null)
                 await Service.SetImageAsync(id, pendingImageId);
+
+            // فایل‌های آپلودشده پیش از ذخیرهٔ محصول، حالا به آن وصل می‌شوند.
+            foreach (var pending in pendingFiles)
+            {
+                await Service.AttachFileAsync(id, pending.StorageId, pending.FileName,
+                    pending.ContentType, pending.SizeBytes);
+            }
+            pendingFiles.Clear();
 
             ToastService.ShowSuccess("محصول ذخیره شد.");
             Navigation.NavigateTo("/content/products");

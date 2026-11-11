@@ -8,4 +8,8 @@ public static class ContentStorage
 {
     public const string Owner = "site-products";
     public const string ProductImageType = "product-image";
+    public const string ProductFileType = "product-file";
+
+    /// <summary>کاتالوگ عمومی سایت (یک‌بار ذخیره می‌شود، نه برای هر محصول).</summary>
+    public const string CatalogType = "site-catalog";
 }

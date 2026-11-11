@@ -87,6 +87,32 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     background: var(--site-dark);
 }
 
+/* پرش به محتوا — فقط برای کاربر کیبورد/صفحه‌خوان، با فوکوس دیده می‌شود */
+.site-skip {
+    position: absolute;
+    inset-inline-start: 50%;
+    top: -100px;
+    z-index: 100;
+    transform: translateX(-50%);
+    padding: 10px 20px;
+    border-radius: 0 0 12px 12px;
+    background: var(--site-navy);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: top 0.15s ease;
+}
+
+.site-skip:focus {
+    top: 0;
+    color: #fff;
+}
+
+.site-shell main:focus {
+    outline: none;
+}
+
 .site-header-inner {
     display: flex;
     align-items: center;
@@ -185,6 +211,74 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     display: flex;
     align-items: center;
     gap: 6px;
+}
+
+/* جست‌وجوی سریع در هدر */
+.site-search {
+    display: flex;
+    align-items: center;
+    height: 38px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+    transition: border-color 0.16s ease, background 0.16s ease;
+}
+
+.site-search:focus-within {
+    border-color: rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.14);
+}
+
+.site-search-input {
+    width: 150px;
+    max-width: 34vw;
+    height: 100%;
+    min-height: 36px;
+    padding: 0 4px 0 14px;
+    border: 0;
+    background: transparent;
+    color: #fff;
+    font-size: 12.5px;
+    outline: none;
+}
+
+.site-search-input::placeholder {
+    color: #9fb3cf;
+}
+
+.site-search-input::-webkit-search-cancel-button {
+    filter: invert(1);
+}
+
+.site-search-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    align-self: stretch;
+    flex: none;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #fff;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.16s ease;
+}
+
+/* آیکن باید دقیقاً وسط باکس بنشیند؛ خط‌-base آیکن‌فونت آن را پایین می‌انداخت */
+.site-search-btn i {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    line-height: 1;
+}
+
+.site-search-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
 }
 
 .site-tool {
@@ -727,6 +821,15 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     text-overflow: ellipsis;
 }
 
+.site-product-code {
+    color: #8fa4c2;
+    font-size: 10.5px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .site-product-price {
     color: #a9bfdc;
     font-size: 11px;
@@ -769,6 +872,11 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
 }
 
 .site-breadcrumb a {
+    /* ناحیهٔ لمسی کافی برای موبایل */
+    display: inline-flex;
+    align-items: center;
+    min-height: 30px;
+    padding-inline: 2px;
     color: var(--site-muted);
     font-weight: 500;
 }
@@ -1054,6 +1162,13 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     margin-top: 20px;
 }
 
+/* بدون min-width صفر، آیتم‌های گرید عرض محتوایشان را می‌گیرند و صفحه
+   در موبایل به‌صورت افقی اسکرول می‌کند. */
+.site-detail-layout > *,
+.site-catalog > * {
+    min-width: 0;
+}
+
 .site-panel {
     padding: clamp(20px, 3vw, 34px);
     border-radius: 22px;
@@ -1223,6 +1338,67 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     overflow: hidden;
 }
 
+/* جدول مشخصاتِ محصول (جدول اصلی سایت مبدأ) در موبایل باید افقی اسکرول شود
+   و فشرده نشود؛ عرض کمینه می‌گذارد تا ستون‌ها خوانا بمانند. */
+.site-specs-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    /* جدول فنیِ سایت مبدأ چپ‌به‌راست است؛ در سایت راست‌چین هم همان ترتیب خوانده شود */
+    direction: ltr;
+}
+
+.site-specs-wrap table {
+    width: 100%;
+    min-width: 680px;
+    border-collapse: collapse;
+    font-size: 11.5px;
+}
+
+.site-specs-wrap th,
+.site-specs-wrap td {
+    padding: 9px 10px;
+    border: 1px solid var(--site-line);
+    text-align: center;
+    color: var(--site-ink);
+    white-space: nowrap;
+}
+
+.site-specs-wrap tr:first-child td {
+    background: var(--site-navy);
+    color: #fff;
+    font-weight: 700;
+    text-align: start;
+}
+
+.site-specs-wrap tr:nth-child(2) td,
+.site-specs-wrap tr:nth-child(3) td {
+    background: var(--site-alt);
+    color: var(--site-heading);
+    font-weight: 600;
+}
+
+/* راهنمای اسکرول افقی جدول — فقط در صفحه‌های کوچک */
+.site-specs-hint {
+    display: none;
+    margin: 0;
+    padding: 9px 14px;
+    border-top: 1px solid var(--site-line);
+    background: var(--site-alt);
+    color: var(--site-muted);
+    font-size: 11px;
+    text-align: center;
+}
+
+.site-specs-hint i {
+    margin-inline-end: 4px;
+}
+
+@media (max-width: 900px) {
+    .site-specs-hint {
+        display: block;
+    }
+}
+
 .site-table {
     width: 100%;
     margin: 0;
@@ -1269,6 +1445,133 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
 .site-detail-desc .content-prose {
     color: var(--site-ink);
     line-height: 2.05;
+}
+
+/* فهرست فایل‌های پیوست محصول */
+.site-files {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.site-file {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 13px 16px;
+    border: 1px solid var(--site-line);
+    border-radius: 14px;
+    background: var(--site-surface);
+    transition: border-color 0.16s ease, transform 0.16s ease;
+}
+
+.site-file:hover {
+    border-color: var(--site-red);
+    transform: translateY(-1px);
+}
+
+.site-file-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 11px;
+    background: rgba(220, 53, 69, 0.12);
+    color: var(--site-red);
+    font-size: 19px;
+    flex: none;
+}
+
+.site-file-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+    flex: 1;
+}
+
+.site-file-name {
+    color: var(--site-heading);
+    font-size: 13px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.site-file-size {
+    color: var(--site-muted);
+    font-size: 11.5px;
+}
+
+.site-file-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: none;
+    padding: 8px 15px;
+    border-radius: 10px;
+    background: var(--site-navy);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    transition: background 0.16s ease;
+}
+
+.site-file-btn:hover {
+    background: var(--site-red);
+    color: #fff;
+}
+
+/* جست‌وجوی کنار دسته‌ها در صفحهٔ محصولات */
+.site-side-search {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 16px;
+}
+
+.site-side-search-input {
+    flex: 1;
+    min-width: 0;
+    height: 38px;
+    padding: 0 12px;
+    border: 1px solid var(--site-line);
+    border-radius: 10px;
+    background: var(--site-surface);
+    color: var(--site-ink);
+    font-size: 12.5px;
+    outline: none;
+    transition: border-color 0.16s ease;
+}
+
+.site-side-search-input:focus {
+    border-color: var(--site-navy);
+}
+
+.site-side-search-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    flex: none;
+    border: 1px solid var(--site-navy);
+    border-radius: 10px;
+    background: var(--site-navy);
+    color: #fff;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.16s ease, border-color 0.16s ease;
+}
+
+.site-side-search-btn:hover {
+    background: var(--site-red);
+    border-color: var(--site-red);
 }
 
 .site-detail-desc .content-prose p:last-child {
@@ -1648,9 +1951,36 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
 
 .site-footer-meta {
     align-self: end;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
     color: #8fa4c2;
     font-size: 11px;
     white-space: nowrap;
+}
+
+.site-footer-catalog {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 20px;
+    color: #fff;
+    font-size: 11.5px;
+    font-weight: 600;
+    transition: border-color 0.16s ease, background 0.16s ease;
+}
+
+.site-footer-catalog:hover {
+    border-color: var(--site-red);
+    background: rgba(220, 53, 69, 0.18);
+    color: #fff;
+}
+
+.site-footer-catalog i {
+    color: var(--site-red);
 }
 
 /* ---------- پنل مدیریت محتوا ---------- */
@@ -1865,6 +2195,16 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
 
     .site-page-btn {
         padding: 0 12px;
+    }
+
+    .site-search {
+        order: 4;
+        width: 100%;
+    }
+
+    .site-search-input {
+        flex: 1;
+        max-width: none;
     }
 }
 

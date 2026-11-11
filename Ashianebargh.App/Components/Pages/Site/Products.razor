@@ -22,6 +22,14 @@
 
     <div class="site-catalog">
         <aside class="site-side">
+            <form class="site-side-search" method="get" action="/products" role="search">
+                <input class="site-side-search-input" type="search" name="q"
+                       placeholder="@Language["search.placeholder"]" aria-label="@Language["search.placeholder"]"
+                       value="@Search" />
+                <button class="site-side-search-btn" type="submit" aria-label="@Language["search.button"]">
+                    <i class="bi bi-search"></i>
+                </button>
+            </form>
             <div class="site-side-head"><h2>@Language["side.categories"]</h2></div>
             <nav class="site-side-nav" aria-label="@Language["aria.categories"]">
                 <a class="@(string.IsNullOrEmpty(Category) ? "on" : "")" href="@ListUrl(null, Tag, 1)">
@@ -62,15 +70,29 @@
             {
                 <div class="site-empty">
                     <i class="bi bi-search"></i>
-                    <p>@Language["products.empty"]</p>
+                    <p>
+                        @(string.IsNullOrWhiteSpace(Search)
+                            ? Language["products.empty"]
+                            : Language["search.noResult"].Replace("{0}", Search))
+                    </p>
                     <a href="/products" class="btn btn-sm btn-outline-secondary">@Language["products.clear"]</a>
                 </div>
             }
             else
             {
                 <div class="site-catalog-bar">
-                    <span class="site-result-count">@Language.ProductCount(result.TotalCount)</span>
-                    @if (!string.IsNullOrEmpty(Category) || !string.IsNullOrEmpty(Tag))
+                    <span class="site-result-count">
+                        @if (!string.IsNullOrWhiteSpace(Search))
+                        {
+                            <span>@Language["search.resultsFor"].Replace("{0}", Search)</span>
+                            <span>&nbsp;·&nbsp;@Language.ProductCount(result.TotalCount)</span>
+                        }
+                        else
+                        {
+                            @Language.ProductCount(result.TotalCount)
+                        }
+                    </span>
+                    @if (!string.IsNullOrEmpty(Category) || !string.IsNullOrEmpty(Tag) || !string.IsNullOrEmpty(Search))
                     {
                         <a class="site-clear" href="/products"><i class="bi bi-x-circle"></i>@Language["products.clear"]</a>
                     }
@@ -106,6 +128,7 @@
     [SupplyParameterFromQuery(Name = "category")] public string? Category { get; set; }
     [SupplyParameterFromQuery(Name = "tag")] public string? Tag { get; set; }
     [SupplyParameterFromQuery(Name = "page")] public int PageNumber { get; set; } = 1;
+    [SupplyParameterFromQuery(Name = "q")] public string? Search { get; set; }
 
     private PagedResult<ProductCardDto>? result;
     private List<CategoryListItemDto> categories = new();
@@ -120,6 +143,7 @@
         {
             CategorySlug = Category,
             TagSlug = Tag,
+            Search = Search,
             Page = PageNumber < 1 ? 1 : PageNumber
         });
     }
@@ -129,6 +153,7 @@
         var query = new List<string>();
         if (!string.IsNullOrEmpty(category)) query.Add("category=" + Uri.EscapeDataString(category));
         if (!string.IsNullOrEmpty(tag)) query.Add("tag=" + Uri.EscapeDataString(tag));
+        if (!string.IsNullOrEmpty(Search)) query.Add("q=" + Uri.EscapeDataString(Search));
         if (pageNumber > 1) query.Add("page=" + pageNumber);
         return query.Count == 0 ? "/products" : "/products?" + string.Join("&", query);
     }

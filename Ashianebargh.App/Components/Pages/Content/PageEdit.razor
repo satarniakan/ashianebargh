@@ -23,16 +23,24 @@
             <DataAnnotationsValidator />
             <div class="row">
                 <div class="col-md-6">
-                    <AppTextField Label="عنوان صفحه" @bind-Value="model.Title" />
+                    <AppTextField Label="عنوان صفحه (فارسی)" @bind-Value="model.Title" />
                 </div>
+                <div class="col-md-6">
+                    <AppTextField Label="عنوان صفحه (انگلیسی)" @bind-Value="model.TitleEn"
+                                  Hint="عنوان نمایشی وقتی زبان سایت انگلیسی است." />
+                </div>
+            </div>
+            <div class="row">
                 <div class="col-md-6">
                     <AppTextField Label="نامک (آدرس)" @bind-Value="model.Slug"
                                   Hint="مثلاً garranty؛ خالی بگذارید تا از عنوان ساخته شود." />
                 </div>
             </div>
 
-            <AppTextArea Label="متن صفحه" @bind-Value="model.Content" Rows="14"
+            <AppTextArea Label="متن صفحه (فارسی)" @bind-Value="model.Content" Rows="14"
                          Hint="متن ساده؛ خط‌های خالی به پاراگراف تبدیل می‌شوند." />
+            <AppTextArea Label="متن صفحه (انگلیسی)" @bind-Value="model.ContentEn" Rows="10"
+                         Hint="متن انگلیسی نمایشی وقتی زبان سایت انگلیسی است." />
 
             <div class="row">
                 <div class="col-md-4">

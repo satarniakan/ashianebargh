@@ -19,6 +19,10 @@
     <div class="site-product-bar">
         <span class="site-product-info">
             <span class="site-product-name" title="@Product.Name">@Product.Name</span>
+            @if (!string.IsNullOrWhiteSpace(Product.Code))
+            {
+                <span class="site-product-code" dir="ltr">@Product.Code</span>
+            }
             <span class="site-product-price">@(Product.Price is null ? Language["card.callForPrice"] : Language.FormatPrice(Product.Price.Value))</span>
         </span>
         <span class="site-product-arrow"><i class="bi @Language.ForwardIcon"></i></span>

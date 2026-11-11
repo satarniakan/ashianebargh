@@ -1,10 +1,10 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Ashianebargh.Domain.Content;
 using Ashianebargh.Infrastructure.Data;
 
 namespace Ashianebargh.Infrastructure.Content;
 
-/// <summary>جدول‌های دامنهٔ محتوا؛ بدون ویرایش پایه و قابل کشف در design-time.</summary>
 public sealed class ContentModelModule : IAshianebarghModule
 {
     public string Name => "Content";
@@ -33,9 +33,11 @@ public sealed class ContentModelModule : IAshianebarghModule
         {
             e.HasKey(x => x.Id);
             e.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            e.Property(x => x.NameEn).HasMaxLength(200);
             e.Property(x => x.Slug).HasMaxLength(200).IsRequired();
             e.Property(x => x.Code).HasMaxLength(50);
             e.Property(x => x.ShortDescription).HasMaxLength(500);
+            e.Property(x => x.ShortDescriptionEn).HasMaxLength(500);
             e.Property(x => x.Price).HasPrecision(18, 0);
             e.Property(x => x.MainImageStorageId).HasMaxLength(100);
             e.HasIndex(x => x.Slug).IsUnique().HasFilter("[IsDeleted] = 0");
@@ -45,8 +47,19 @@ public sealed class ContentModelModule : IAshianebarghModule
                 .WithMany(c => c.Products)
                 .HasForeignKey(x => x.CategoryId)
                 .OnDelete(DeleteBehavior.Restrict);
-            // رابطهٔ چندبه‌چند با جدول واسط خودکار EF
             e.HasMany(x => x.Tags).WithMany(t => t.Products).UsingEntity("ProductTags");
+        });
+
+        builder.Entity<ProductFile>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.FileName).HasMaxLength(255).IsRequired();
+            e.Property(x => x.StorageId).HasMaxLength(100).IsRequired();
+            e.Property(x => x.ContentType).HasMaxLength(100);
+            e.HasOne(x => x.Product)
+                .WithMany(p => p.Files)
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         builder.Entity<Page>(e =>
@@ -56,6 +69,20 @@ public sealed class ContentModelModule : IAshianebarghModule
             e.Property(x => x.Slug).HasMaxLength(200).IsRequired();
             e.HasIndex(x => x.Slug).IsUnique().HasFilter("[IsDeleted] = 0");
             e.HasIndex(x => new { x.IsPublished, x.ShowInMenu, x.SortOrder });
+
+            e.HasMany(x => x.Translations)
+                .WithOne(t => t.Page!)
+                .HasForeignKey(t => t.PageId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<PageTranslation>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.LanguageCode).HasMaxLength(10).IsRequired();
+            e.Property(x => x.Title).HasMaxLength(200).IsRequired();
+            e.HasIndex(x => new { x.PageId, x.LanguageCode }).IsUnique().HasFilter("[IsDeleted] = 0");
+            e.HasIndex(x => x.LanguageCode);
         });
 
         builder.Entity<ContactInfo>(e =>

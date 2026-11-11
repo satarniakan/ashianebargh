@@ -19,6 +19,7 @@
     <PackageReference Include="Serilog.AspNetCore" />
     <PackageReference Include="Microsoft.FeatureManagement.AspNetCore" />
     <PackageReference Include="Telegram.Bot" />
+    <PackageReference Include="AngleSharp" />
   </ItemGroup>
 
   <ItemGroup>
@@ -28,6 +29,8 @@
 
   <ItemGroup>
     <Content Include="SeedAssets\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Remove="SeedAssets\products\manifest.json" />
+    <Content Include="SeedAssets\products\manifest.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

@@ -25,6 +25,9 @@ public static class FrameworkSettingKeys
 {
     public const string SiteName = "site:name";
     public const string OtpSmsTemplate = "sms:otp-template";
+
+    /// <summary>شناسهٔ فایل کاتالوگ عمومی سایت در فضای ذخیره‌سازی.</summary>
+    public const string SiteCatalogFile = "site:catalog-file";
 }
 
 /// <summary>مقادیر پیش‌فرض تنظیمات پایه — وقتی ردیفی در دیتابیس نیست، این‌ها برمی‌گردند.</summary>

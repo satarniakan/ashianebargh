@@ -15,18 +15,22 @@ namespace Ashianebargh.App.Components.Layout;
 /// <param name="Children">زیرآیتم‌ها؛ اگر null باشد آیتم یک لینک ساده است.</param>
 public sealed record NavItem(
     string Title,
+    string TitleEn = "",
     string? Href = null,
     string? Icon = null,
     string? RequiredPermission = null,
     IReadOnlyList<NavItem>? Children = null)
 {
     /// <summary>یک آیتم سادهٔ تکی (بدون زیرمنو).</summary>
-    public static NavItem Link(string title, string href, string icon, string? permission = null) =>
-        new(title, href, icon, permission);
+    public static NavItem Link(string title, string href, string icon, string? permission = null, string? titleEn = null) =>
+        new(title, titleEn ?? string.Empty, href, icon, permission);
 
     /// <summary>یک گروه بازشونده (زیرمنو).</summary>
     public static NavItem Group(string title, string icon, params NavItem[] children) =>
-        new(title, null, icon, null, children);
+        new(title, string.Empty, null, icon, null, children);
+
+    /// <summary>عنوان نمایشی بر اساس زبان فعلی.</summary>
+    public string DisplayTitle(bool isEnglish) => isEnglish && !string.IsNullOrWhiteSpace(TitleEn) ? TitleEn : Title;
 }
 
 /// <summary>

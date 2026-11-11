@@ -10,6 +10,7 @@
 @inject SiteLanguage Language
 
 <div class="site-shell" dir="@Language.Dir" lang="@Language.Code" data-lang="@Language.Code">
+    <a class="site-skip" href="#site-main">@T("nav.skipToContent")</a>
     <header class="site-header">
         <div class="site-header-inner">
             <a class="site-brand" href="/">
@@ -21,17 +22,25 @@
             </a>
 
             <nav class="site-nav" aria-label="@T("aria.mainMenu")">
-                <a href="/" class="@NavClass("/")">@T("nav.home")</a>
-                <a href="/products" class="@NavClass("/products")">@T("nav.products")</a>
+                <a href="/" class="@NavClass("/")" aria-current="@AriaCurrent("/")">@T("nav.home")</a>
+                <a href="/products" class="@NavClass("/products")" aria-current="@AriaCurrent("/products")">@T("nav.products")</a>
                 @foreach (var item in menu)
                 {
-                    <a href="/@item.Slug" class="@NavClass("/" + item.Slug)">@item.Title</a>
+                    <a href="/@item.Slug" class="@NavClass("/" + item.Slug)" aria-current="@AriaCurrent("/" + item.Slug)">@(Language.IsEnglish ? item.TitleEn : item.Title)</a>
                 }
-                <a href="/about" class="@NavClass("/about")">@T("nav.about")</a>
-                <a href="/contact" class="@NavClass("/contact")">@T("nav.contact")</a>
+                <a href="/about" class="@NavClass("/about")" aria-current="@AriaCurrent("/about")">@T("nav.about")</a>
+                <a href="/contact" class="@NavClass("/contact")" aria-current="@AriaCurrent("/contact")">@T("nav.contact")</a>
             </nav>
 
             <div class="site-actions">
+                <form class="site-search" method="get" action="/products" role="search">
+                    <input class="site-search-input" type="search" name="q"
+                           placeholder="@Language["search.placeholder"]" aria-label="@Language["search.placeholder"]"
+                           value="@searchTerm" />
+                    <button class="site-search-btn" type="submit" aria-label="@Language["search.button"]">
+                        <i class="bi bi-search"></i>
+                    </button>
+                </form>
                 <div class="site-tools">
                     <a class="site-tool site-tool-lang" href="@LanguageSwitchUrl"
                        data-lang-toggle="@(Language.IsEnglish ? "fa" : "en")"
@@ -60,7 +69,7 @@
         </div>
     </header>
 
-    <main class="site-main">
+    <main class="site-main" id="site-main" tabindex="-1">
         @Body
     </main>
 
@@ -91,9 +100,14 @@
                 }
             </div>
 
-            <div class="site-footer-meta">© @(Language.IsEnglish
-                ? DateTime.Now.Year.ToString(System.Globalization.CultureInfo.InvariantCulture)
-                : new System.Globalization.PersianCalendar().GetYear(DateTime.Now).ToString("0", System.Globalization.CultureInfo.InvariantCulture)) — @siteName</div>
+            <div class="site-footer-meta">
+                <a class="site-footer-catalog" href="/media/catalog">
+                    <i class="bi bi-file-earmark-arrow-down"></i>@T("footer.catalog")
+                </a>
+                <span>© @(Language.IsEnglish
+                    ? DateTime.Now.Year.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    : new System.Globalization.PersianCalendar().GetYear(DateTime.Now).ToString("0", System.Globalization.CultureInfo.InvariantCulture)) — @siteName</span>
+            </div>
         </div>
     </footer>
 </div>
@@ -103,6 +117,7 @@
     private List<PageMenuItemDto> menu = new();
     private ContactInfoDto? contact;
     private bool isAuthenticated;
+    private string searchTerm = string.Empty;
 
     private string T(string key) => Language[key];
 
@@ -133,9 +148,17 @@
 
         menu = await pages.GetMenuAsync();
         contact = await contacts.GetInfoAsync();
+
+        // عبارت جست‌وجوی جاری از نشانی صفحه خوانده می‌شود تا داخل کادر جست‌وجو بماند.
+        Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(Nav.Uri)
+            .TryGetValue("q", out var q);
+        searchTerm = q.ToString();
     }
 
     private string NavClass(string path) => IsActive(path) ? "on" : string.Empty;
+
+    /// <summary>نشانهٔ صفحهٔ جاری برای صفحه‌خوان‌ها (aria-current).</summary>
+    private string AriaCurrent(string path) => IsActive(path) ? "page" : null!;
 
     private bool IsActive(string path)
     {

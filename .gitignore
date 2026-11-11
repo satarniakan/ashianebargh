@@ -45,3 +45,6 @@ Thumbs.db
 
 # Data Protection keys (created at runtime by the sample host)
 DataProtection-Keys/
+
+# Runtime file storage (uploaded images & attachments) — never in git
+/Ashianebargh.App/AppData/

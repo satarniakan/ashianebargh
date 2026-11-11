@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Ashianebargh.Domain.Common;
+using Ashianebargh.Domain.Content;
 using Ashianebargh.Domain.Entities;
 using Ashianebargh.Domain.Identity;
 using Ashianebargh.Domain.Interfaces;
@@ -60,6 +61,8 @@ public class AshianebarghDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<Setting> Settings => Set<Setting>();
     public DbSet<NumberSequence> NumberSequences => Set<NumberSequence>();
     public DbSet<PushSubscription> PushSubscriptions => Set<PushSubscription>();
+    public DbSet<PageTranslation> PageTranslations => Set<PageTranslation>();
+    public DbSet<ProductFile> ProductFiles => Set<ProductFile>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

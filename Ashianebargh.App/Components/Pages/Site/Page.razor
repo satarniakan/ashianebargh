@@ -20,16 +20,16 @@ else
 {
     var visual = PageVisual(view.Slug);
 
-    <PageTitle>@view.Title | آشیانه برق</PageTitle>
+    <PageTitle>@(Language.IsEnglish ? view.TitleEn : view.Title) | آشیانه برق</PageTitle>
 
     <div class="site-container">
         <div class="site-page-head">
             <nav class="site-breadcrumb" aria-label="@Language["aria.breadcrumb"]">
                 <a href="/">@Language["common.home"]</a>
                 <span class="sep">/</span>
-                <span class="current">@view.Title</span>
+                <span class="current">@(Language.IsEnglish ? view.TitleEn : view.Title)</span>
             </nav>
-            <h1>@view.Title</h1>
+            <h1>@(Language.IsEnglish ? view.TitleEn : view.Title)</h1>
         </div>
 
         @if (string.IsNullOrWhiteSpace(view.Content))
@@ -45,11 +45,11 @@ else
                 @if (visual is not null)
                 {
                     <figure class="site-page-visual">
-                        <img src="@visual" alt="@view.Title" />
+                        <img src="@visual" alt="@(Language.IsEnglish ? view.TitleEn : view.Title)" />
                     </figure>
                 }
                 <div class="content-panel">
-                    <ContentParagraphs Text="@view.Content" />
+                    <ContentParagraphs Text="@(Language.IsEnglish ? view.ContentEn : view.Content)" />
                 </div>
             </div>
         }

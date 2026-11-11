@@ -18,6 +18,7 @@ public sealed class SiteLanguage
         ["nav.products"] = "محصولات",
         ["nav.about"] = "درباره ما",
         ["nav.contact"] = "تماس با ما",
+        ["nav.skipToContent"] = "پرش به محتوای اصلی",
         ["action.quote"] = "درخواست استعلام",
         ["action.dashboard"] = "پنل مدیریت",
         ["action.login"] = "ورود",
@@ -28,6 +29,7 @@ public sealed class SiteLanguage
         ["aria.categories"] = "دسته‌بندی محصولات",
         ["aria.pagination"] = "صفحه‌بندی",
         ["footer.fallback"] = "همراه شما برای انتخاب درست",
+        ["footer.catalog"] = "دانلود کاتالوگ",
         ["home.title"] = "آشیانه برق | معرفی محصولات",
         ["home.eyebrow"] = "تأمین تخصصی تجهیزات برق",
         ["home.lead"] = "معرفی و عرضهٔ محصولات برقی و روشنایی؛ همراه با راهنمایی برای انتخاب درست، پشتیبانی فنی و ارسال به سراسر کشور.",
@@ -55,6 +57,13 @@ public sealed class SiteLanguage
         ["side.all"] = "همه",
         ["products.empty"] = "محصولی با این فیلتر پیدا نشد.",
         ["products.clear"] = "حذف فیلترها",
+        ["search.placeholder"] = "جست‌وجوی محصول…",
+        ["search.button"] = "جست‌وجو",
+        ["search.resultsFor"] = "نتایج جست‌وجو برای «{0}»",
+        ["search.noResult"] = "نتیجه‌ای برای «{0}» یافت نشد.",
+        ["detail.files"] = "فایل‌های پیوست",
+        ["detail.filesEmpty"] = "برای این محصول فایلی پیوست نشده است.",
+        ["detail.download"] = "دانلود",
         ["pager.previous"] = "قبلی",
         ["pager.next"] = "بعدی",
         ["detail.notFoundTitle"] = "محصول یافت نشد | آشیانه برق",
@@ -66,6 +75,7 @@ public sealed class SiteLanguage
         ["detail.quote"] = "استعلام و سفارش",
         ["detail.other"] = "سایر محصولات",
         ["detail.specs"] = "مشخصات محصول",
+        ["detail.summary"] = "اطلاعات کلی",
         ["detail.attribute"] = "ویژگی",
         ["detail.value"] = "مقدار",
         ["detail.code"] = "کد محصول",
@@ -112,6 +122,7 @@ public sealed class SiteLanguage
         ["nav.products"] = "Products",
         ["nav.about"] = "About",
         ["nav.contact"] = "Contact",
+        ["nav.skipToContent"] = "Skip to main content",
         ["action.quote"] = "Request a quote",
         ["action.dashboard"] = "Dashboard",
         ["action.login"] = "Sign in",
@@ -122,6 +133,7 @@ public sealed class SiteLanguage
         ["aria.categories"] = "Product categories",
         ["aria.pagination"] = "Pagination",
         ["footer.fallback"] = "Helping you make the right choice",
+        ["footer.catalog"] = "Download catalog",
         ["home.title"] = "Ashianebargh | Products",
         ["home.eyebrow"] = "Specialized electrical supplies",
         ["home.lead"] = "Electrical and lighting products with expert guidance, technical support, and nationwide delivery.",
@@ -149,6 +161,13 @@ public sealed class SiteLanguage
         ["side.all"] = "All",
         ["products.empty"] = "No products match this filter.",
         ["products.clear"] = "Clear filters",
+        ["search.placeholder"] = "Search products…",
+        ["search.button"] = "Search",
+        ["search.resultsFor"] = "Search results for “{0}”",
+        ["search.noResult"] = "No results found for “{0}”.",
+        ["detail.files"] = "Attachments",
+        ["detail.filesEmpty"] = "No files are attached to this product.",
+        ["detail.download"] = "Download",
         ["pager.previous"] = "Previous",
         ["pager.next"] = "Next",
         ["detail.notFoundTitle"] = "Product not found | Ashianebargh",
@@ -160,6 +179,7 @@ public sealed class SiteLanguage
         ["detail.quote"] = "Request & order",
         ["detail.other"] = "More products",
         ["detail.specs"] = "Specifications",
+        ["detail.summary"] = "General information",
         ["detail.attribute"] = "Attribute",
         ["detail.value"] = "Value",
         ["detail.code"] = "Product code",
@@ -224,6 +244,15 @@ public sealed class SiteLanguage
         IsEnglish
             ? price.ToString("N0", CultureInfo.InvariantCulture) + " Toman"
             : Ashianebargh.Application.Helpers.CurrencyFormatter.ToToman(price);
+
+    /// <summary>اندازهٔ فایل با واحد خوانا (KB/MB) برای نمایش در فهرست پیوست‌ها.</summary>
+    public string FileSize(long bytes)
+    {
+        if (bytes <= 0) return "—";
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{(bytes / 1024d):0.#} KB";
+        return $"{(bytes / (1024d * 1024d)):0.#} MB";
+    }
 
     /// <summary>آیکون «رفتن به جلو» که در RTL چپ و در LTR راست است.</summary>
     public string ForwardIcon => IsEnglish ? "bi-arrow-right" : "bi-arrow-left";

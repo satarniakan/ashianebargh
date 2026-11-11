@@ -1,4 +1,4 @@
-// Ashianebargh.App/Program.cs
+﻿// Ashianebargh.App/Program.cs
 // میزبان خالی: پایه را بدون هیچ دامنه‌ای بالا می‌آورد. دامنهٔ خودتان را با
 // IAshianebarghModule / IPermissionCatalog / INavProvider وصل کنید.
 using Microsoft.AspNetCore.HttpOverrides;

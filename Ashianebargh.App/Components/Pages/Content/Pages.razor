@@ -32,7 +32,8 @@
             <table class="table mb-0">
                 <thead>
                     <tr>
-                        <th>عنوان</th>
+                        <th>عنوان (فارسی)</th>
+                        <th>عنوان (انگلیسی)</th>
                         <th>آدرس</th>
                         <th>وضعیت</th>
                         <th>در منو</th>
@@ -45,6 +46,7 @@
                     {
                         <tr>
                             <td>@item.Title</td>
+                            <td>@item.TitleEn</td>
                             <td dir="ltr" class="text-end">/@item.Slug</td>
                             <td>
                                 @if (item.IsPublished)
