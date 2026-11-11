@@ -27,10 +27,12 @@
     <ProjectReference Include="..\Ashianebargh.Infrastructure\Ashianebargh.Infrastructure.csproj" />
   </ItemGroup>
 
+  <!-- متریال سید فقط برای اجرای محلی توسعه در خروجی build می‌ماند؛
+       انتشار/ایمیج تولیدی آن را حمل نمی‌کند — داخل داکر به‌صورت ولوِل مونت می‌شود. -->
   <ItemGroup>
-    <Content Include="SeedAssets\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="SeedAssets\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" />
     <Content Remove="SeedAssets\products\manifest.json" />
-    <Content Include="SeedAssets\products\manifest.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="SeedAssets\products\manifest.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" />
   </ItemGroup>
 
 </Project>

@@ -42,6 +42,11 @@ services:
       Identity__FirstAdminPhoneNumber: ""
     ports:
       - "8080:8080"
+    volumes:
+      # داده‌های آپلودی اپ باید بین استقرارها بمانند؛ بدون این ولوِل هر up --build فایل‌ها را پاک می‌کند.
+      - appdata:/app/AppData
+      # متریال سید از میزبان مونت می‌شود تا ایمیج تولیدی آن را حمل نکند (فقط Development).
+      - ./Ashianebargh.App/SeedAssets:/app/SeedAssets:ro
     depends_on:
       sqlserver:
         condition: service_healthy
@@ -51,3 +56,4 @@ services:
 volumes:
   sqldata:
   redisdata:
+  appdata:

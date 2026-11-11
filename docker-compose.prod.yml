@@ -48,6 +48,8 @@ services:
       # همزمان، این را false کنید و مایگریشن را یکبار و جداگانه اجرا نمایید.
       Database__AutoMigrate: ${APP_AUTO_MIGRATE:-true}
     volumes:
+      # داده‌های آپلودی اپ باید بین استقرارها بمانند؛ بدون این ولوِل هر redeploy فایل‌ها را پاک می‌کند.
+      - appdata:/app/AppData
       # کلیدهای DataProtection بیرون از کانتینر می‌مانند تا با هر redeploy
       # کوکی‌ها، توکن‌های ضدجعل و secretهای رمزنگاری‌شده نپرند.
       - dataprotection:/app/DataProtection-Keys
@@ -69,5 +71,6 @@ services:
 
 volumes:
   dataprotection:
+  appdata:
   caddydata:
   caddyconfig:

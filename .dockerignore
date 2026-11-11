@@ -11,6 +11,8 @@ Logs/
 AppData/
 Ashianebargh.App/AppData/
 Ashianebargh.App/Logs/
+# متریال سید در ایمیج نمی‌رود؛ در compose به‌صورت ولوِل مونت می‌شود.
+Ashianebargh.App/SeedAssets/
 Ashianebargh.App/appsettings.json
 Ashianebargh.App/appsettings.Development.json
 *.user
