@@ -493,6 +493,111 @@ namespace Ashianebargh.App.Migrations
                     b.ToTable("ProductFiles");
                 });
 
+            modelBuilder.Entity("Ashianebargh.Domain.Content.ProductImage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedByUserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<string>("StorageId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsDeleted");
+
+                    b.HasIndex("ProductId", "SortOrder");
+
+                    b.HasIndex("ProductId", "StorageId")
+                        .IsUnique()
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.ToTable("ProductImage");
+                });
+
+            modelBuilder.Entity("Ashianebargh.Domain.Content.ProductSpec", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedByUserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsDeleted");
+
+                    b.HasIndex("ProductId", "SortOrder");
+
+                    b.ToTable("ProductSpec");
+                });
+
             modelBuilder.Entity("Ashianebargh.Domain.Content.Tag", b =>
                 {
                     b.Property<int>("Id")
@@ -662,7 +767,8 @@ namespace Ashianebargh.App.Migrations
 
                     b.Property<string>("Code")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
@@ -675,13 +781,17 @@ namespace Ashianebargh.App.Migrations
 
                     b.Property<string>("PhoneNumber")
                         .IsRequired()
-                        .HasColumnType("nvarchar(450)");
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<int>("Purpose")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
                     b.HasIndex("ExpiresAt");
 
-                    b.HasIndex("PhoneNumber");
+                    b.HasIndex("PhoneNumber", "Purpose", "Code");
 
                     b.ToTable("OtpCodes");
                 });
@@ -944,6 +1054,10 @@ namespace Ashianebargh.App.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("ActorId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
                     b.Property<string>("Details")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -953,6 +1067,10 @@ namespace Ashianebargh.App.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
                     b.Property<DateTime>("OccurredAt")
                         .HasColumnType("datetime2");
 
@@ -961,6 +1079,8 @@ namespace Ashianebargh.App.Migrations
                         .HasColumnType("nvarchar(256)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ActorId");
 
                     b.HasIndex("OccurredAt");
 
@@ -1148,6 +1268,28 @@ namespace Ashianebargh.App.Migrations
                     b.Navigation("Product");
                 });
 
+            modelBuilder.Entity("Ashianebargh.Domain.Content.ProductImage", b =>
+                {
+                    b.HasOne("Ashianebargh.Domain.Content.Product", "Product")
+                        .WithMany("Images")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("Ashianebargh.Domain.Content.ProductSpec", b =>
+                {
+                    b.HasOne("Ashianebargh.Domain.Content.Product", "Product")
+                        .WithMany("Specs")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
                 {
                     b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole", null)
@@ -1227,6 +1369,10 @@ namespace Ashianebargh.App.Migrations
             modelBuilder.Entity("Ashianebargh.Domain.Content.Product", b =>
                 {
                     b.Navigation("Files");
+
+                    b.Navigation("Images");
+
+                    b.Navigation("Specs");
                 });
 #pragma warning restore 612, 618
         }

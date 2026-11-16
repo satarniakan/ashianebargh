@@ -7,6 +7,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Ashianebargh.Application.Services;
+using Ashianebargh.Domain.Exceptions;
 using Ashianebargh.Domain.Identity;
 using Ashianebargh.Domain.Interfaces;
 using Ashianebargh.Infrastructure.Data;
@@ -24,6 +25,7 @@ public class SettingServiceTests
         public IReadOnlyList<SettingDescriptor> All { get; } =
         [
             new("test:greeting", "خوش‌آمد", "سلام پیش‌فرض", "تست"),
+            new("test:other", "کلید دیگر", "", "تست"),
             new("test:secret", "کلید محرمانه", "", "تست", IsSecret: true)
         ];
     }
@@ -170,5 +172,24 @@ public class SettingServiceTests
             It.IsAny<string?>(),
             It.Is<string>(d => d.Contains("test:secret") && !d.Contains("s3cr3t-value"))),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task SetAsync_UnknownKey_IsRejected()
+    {
+        var (service, _, _) = Build();
+
+        // رگرسیون: فقط کلیدهای کاتالوگ/پایه قابل نوشتن‌اند، نه کلید دلخواه.
+        await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            service.SetAsync("test:unknown-key", "مقدار"));
+    }
+
+    [Fact]
+    public async Task SetAsync_FrameworkKey_IsAllowed()
+    {
+        var (service, _, _) = Build();
+
+        await service.SetAsync(FrameworkSettingKeys.SiteName, "نام جدید");
+        Assert.Equal("نام جدید", await service.GetAsync(FrameworkSettingKeys.SiteName));
     }
 }

@@ -1,4 +1,5 @@
 @page "/about"
+@attribute [AllowAnonymous]
 @layout SiteLayout
 @using Ashianebargh.Application.Content
 @using Ashianebargh.App.Services
@@ -17,19 +18,21 @@
 }
 else
 {
-    <PageTitle>@(Language.IsEnglish ? view.TitleEn : view.Title) | آشیانه برق</PageTitle>
+    <PageTitle>@Title | آشیانه برق</PageTitle>
+    <SeoMeta Title="@Title"
+             Description="@AboutDescription" Path="/about" Type="website" />
 
     <div class="site-container">
         <div class="site-page-head">
             <nav class="site-breadcrumb" aria-label="@Language["aria.breadcrumb"]">
                 <a href="/">@Language["common.home"]</a>
                 <span class="sep">/</span>
-                <span class="current">@(Language.IsEnglish ? view.TitleEn : view.Title)</span>
+                <span class="current">@Title</span>
             </nav>
-            <h1>@(Language.IsEnglish ? view.TitleEn : view.Title)</h1>
+            <h1>@Title</h1>
         </div>
 
-        @if (string.IsNullOrWhiteSpace(view.Content))
+        @if (string.IsNullOrWhiteSpace(Body))
         {
             <div class="site-empty">
                 <i class="bi bi-file-earmark-text"></i>
@@ -39,7 +42,7 @@ else
         else
         {
             <div class="content-panel">
-                <ContentParagraphs Text="@(Language.IsEnglish ? view.ContentEn : view.Content)" />
+                <ContentParagraphs Text="@Body" />
             </div>
         }
     </div>
@@ -47,6 +50,26 @@ else
 
 @code {
     private PageViewDto? view;
+
+    private string Title => LocalizedText.Pick(Language.IsEnglish, view?.TitleEn, view?.Title);
+
+    private string? Body =>
+        Language.IsEnglish && !string.IsNullOrWhiteSpace(view?.ContentEn) ? view.ContentEn : view?.Content;
+
+    /// <summary>توضیح متا از متن صفحه (بدون تگ) ساخته می‌شود.</summary>
+    private string AboutDescription
+    {
+        get
+        {
+            var content = Body;
+            if (string.IsNullOrWhiteSpace(content)) return Language["about.title"];
+
+            var text = System.Text.RegularExpressions.Regex.Replace(content, "<[^>]+>", " ");
+            text = System.Net.WebUtility.HtmlDecode(text).Trim();
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ");
+            return text.Length <= 160 ? text : text[..157].TrimEnd() + "…";
+        }
+    }
 
     protected override async Task OnInitializedAsync()
         => view = await PageService.GetAboutAsync();

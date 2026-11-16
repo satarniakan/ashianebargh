@@ -49,7 +49,10 @@ public class ApiTokenAuthenticationHandler : AuthenticationHandler<Authenticatio
         }
         catch (Exception ex)
         {
-            return AuthenticateResult.Fail($"خطا در اعتبارسنجی توکن: {ex.Message}");
+            // جزئیات فنی فقط در لاگ داخلی می‌ماند؛ پیام خام خطا (که ممکن است شامل
+            // جزئیات دیتابیس/اتصال باشد) به کلاینت یا لاگِ دسترسی درز نمی‌کند.
+            Logger.LogError(ex, "خطا در اعتبارسنجی توکن API");
+            return AuthenticateResult.Fail("خطا در اعتبارسنجی توکن.");
         }
 
         if (principal is null)

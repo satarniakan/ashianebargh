@@ -1,4 +1,5 @@
 ﻿@page "/verify-otp"
+@attribute [AllowAnonymous]
 @attribute [ExcludeFromInteractiveRouting]
 
 <PageTitle>تأیید کد</PageTitle>
@@ -10,7 +11,11 @@
             کد ۶ رقمی ارسال‌شده به شماره <strong>@Phone</strong> را وارد کنید.
         </p>
 
-        @if (Error is not null)
+        @if (Error == "captcha")
+        {
+            <div class="alert alert-danger">اعتبارسنجی امنیتی ناموفق بود؛ دوباره تلاش کنید.</div>
+        }
+        else if (Error is not null)
         {
             <div class="alert alert-danger">کد وارد‌شده صحیح نیست یا منقضی شده است.</div>
         }
@@ -23,6 +28,8 @@
                 <label class="form-label">کد تأیید</label>
                 <input type="text" name="code" class="form-control text-center" maxlength="6" pattern="[0-9]{6}" required style="letter-spacing: 0.3rem; font-size: 1.2rem;" />
             </div>
+
+            <TurnstileWidget />
 
             <button type="submit" class="btn btn-primary w-100">تأیید و ورود</button>
         </form>

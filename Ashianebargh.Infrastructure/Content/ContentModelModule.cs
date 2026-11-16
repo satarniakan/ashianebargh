@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Ashianebargh.Domain.Content;
 using Ashianebargh.Infrastructure.Data;
@@ -58,6 +58,31 @@ public sealed class ContentModelModule : IAshianebarghModule
             e.Property(x => x.ContentType).HasMaxLength(100);
             e.HasOne(x => x.Product)
                 .WithMany(p => p.Files)
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<ProductSpec>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Title).HasMaxLength(100).IsRequired();
+            e.Property(x => x.Value).HasMaxLength(500).IsRequired();
+            e.HasIndex(x => new { x.ProductId, x.SortOrder });
+            e.HasOne(x => x.Product)
+                .WithMany(p => p.Specs)
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<ProductImage>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.StorageId).HasMaxLength(100).IsRequired();
+            e.HasIndex(x => new { x.ProductId, x.SortOrder });
+            // گالری نباید دو بار یک فایل را در یک محصول نشان دهد.
+            e.HasIndex(x => new { x.ProductId, x.StorageId }).IsUnique().HasFilter("[IsDeleted] = 0");
+            e.HasOne(x => x.Product)
+                .WithMany(p => p.Images)
                 .HasForeignKey(x => x.ProductId)
                 .OnDelete(DeleteBehavior.Cascade);
         });

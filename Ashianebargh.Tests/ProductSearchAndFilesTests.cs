@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Ashianebargh.Application.Content;
 using Ashianebargh.Domain.Content;
+using Ashianebargh.Domain.Exceptions;
 using Ashianebargh.Domain.Interfaces;
 using Ashianebargh.Infrastructure.Content;
 using Ashianebargh.Infrastructure.Data;
@@ -185,5 +186,83 @@ public class ProductSearchAndFilesTests
         Assert.Empty(await db.ProductFiles.ToListAsync());
         storage.Verify(s => s.DeleteAsync(It.IsAny<string>(), It.Is<string>(t => t == "product-file"),
             It.IsAny<string>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task IsImagePublic_HidesImage_WhenProductInactive()
+    {
+        var (db, uow, storage) = Build();
+        await using var _ = db;
+        var category = await SeedCategoryAsync(db);
+        var product = await SeedProductAsync(db, category, "AFF", "AFF-01");
+        product.MainImageStorageId = "img-1";
+        await db.SaveChangesAsync();
+
+        var service = new ProductService(uow, storage.Object, NullLogger<ProductService>.Instance);
+
+        Assert.True(await service.IsImagePublicAsync("img-1"));
+
+        product.IsActive = false;
+        await db.SaveChangesAsync();
+
+        // رگرسیون: با غیرفعال‌شدن محصول، تصویرش دیگر نباید عمومی سرو شود.
+        Assert.False(await service.IsImagePublicAsync("img-1"));
+    }
+
+    [Fact]
+    public async Task IsFilePublic_HidesFile_WhenProductInactive()
+    {
+        var (db, uow, storage) = Build();
+        await using var _ = db;
+        var category = await SeedCategoryAsync(db);
+        var product = await SeedProductAsync(db, category, "AFF", "AFF-01");
+
+        var service = new ProductService(uow, storage.Object, NullLogger<ProductService>.Instance);
+        await using var stream = new MemoryStream(Encoding.UTF8.GetBytes("pdf"));
+        var dto = await service.AddFileAsync(product.Id, stream, "AFF.pdf", "application/pdf");
+
+        Assert.True(await service.IsFilePublicAsync(dto.StorageId));
+
+        product.IsActive = false;
+        await db.SaveChangesAsync();
+
+        Assert.False(await service.IsFilePublicAsync(dto.StorageId));
+    }
+
+    [Fact]
+    public async Task AttachFile_RejectsStorageId_ThatDoesNotExist()
+    {
+        var (db, uow, storage) = Build();
+        await using var _ = db;
+        var category = await SeedCategoryAsync(db);
+        var product = await SeedProductAsync(db, category, "AFF", "AFF-01");
+
+        storage.Setup(s => s.ExistsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+            .ReturnsAsync(false);
+
+        var service = new ProductService(uow, storage.Object, NullLogger<ProductService>.Instance);
+
+        // رگرسیون: storageId جعلی/ناموجود نباید به محصول وصل شود.
+        await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            service.AttachFileAsync(product.Id, "ghost-id", "x.pdf", "application/pdf", 10));
+        Assert.Empty(await db.ProductFiles.ToListAsync());
+    }
+
+    [Fact]
+    public async Task AttachFile_AcceptsStorageId_ThatExists()
+    {
+        var (db, uow, storage) = Build();
+        await using var _ = db;
+        var category = await SeedCategoryAsync(db);
+        var product = await SeedProductAsync(db, category, "AFF", "AFF-01");
+
+        storage.Setup(s => s.ExistsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+            .ReturnsAsync(true);
+
+        var service = new ProductService(uow, storage.Object, NullLogger<ProductService>.Instance);
+
+        var dto = await service.AttachFileAsync(product.Id, "real-id", "x.pdf", "application/pdf", 10);
+        Assert.Equal("real-id", dto.StorageId);
+        Assert.Single(await db.ProductFiles.ToListAsync());
     }
 }

@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Ashianebargh.Application.Validators;
 using Ashianebargh.Domain.Entities;
 using Ashianebargh.Domain.Identity;
 using Ashianebargh.Domain.Interfaces;
@@ -59,6 +60,15 @@ public class ApiTokenService : IApiTokenService
     private readonly IConfiguration _configuration;
     private readonly ILogger<ApiTokenService> _logger;
     private readonly TimeProvider _clock;
+    private readonly IPasswordHasher<ApplicationUser> _passwordHasher;
+    private readonly IAuditService? _audit;
+
+    /// <summary>
+    /// هشِ یک رمز تصادفیِ دورریختنی برای مسیر «کاربر ناموجود» — همان هزینهٔ PBKDF2
+    /// مسیرِ «رمز اشتباه» تا اختلاف زمان، ثبت‌شده‌بودن نام کاربری را لو ندهد.
+    /// </summary>
+    private static readonly string DummyPasswordHash =
+        new PasswordHasher<ApplicationUser>().HashPassword(new ApplicationUser(), Guid.NewGuid().ToString("N"));
 
     public ApiTokenService(
         IApiTokenRepository tokens,
@@ -70,7 +80,9 @@ public class ApiTokenService : IApiTokenService
         ISettingService settings,
         IConfiguration configuration,
         ILogger<ApiTokenService> logger,
-        TimeProvider? clock = null)
+        TimeProvider? clock = null,
+        IPasswordHasher<ApplicationUser>? passwordHasher = null,
+        IAuditService? audit = null)
     {
         _tokens = tokens;
         _otpService = otpService;
@@ -82,21 +94,25 @@ public class ApiTokenService : IApiTokenService
         _configuration = configuration;
         _logger = logger;
         _clock = clock ?? TimeProvider.System;
+        _passwordHasher = passwordHasher ?? new PasswordHasher<ApplicationUser>();
+        _audit = audit;
     }
 
     public async Task<TokenIssueResult> VerifyOtpAndIssueTokenAsync(
         string phoneNumber, string code, string? deviceName)
     {
-        // کد یک‌بارمصرف است؛ ترتیب «اول کاربر، بعد مصرف کد» لازم است تا کاربرِ
-        // ناموجود کد معتبر خودش را بی‌دلیل از دست ندهد. نرمال‌سازی هم مثل مسیر وب
-        // انجام می‌شود (ارقام فارسی/عربی) تا هش و جست‌وجوی کاربر بخواند.
+        // کد اول تأیید/مصرف می‌شود و بعد کاربر جست‌وجو می‌شود. ترتیب قبلی («اول کاربر»)
+        // برای شمارهٔ ناموجود بلافاصله برمی‌گشت ولی برای شمارهٔ ثبت‌شده هش + کوئری + شمارندهٔ
+        // تلاش می‌زد؛ همین اختلاف زمان به مهاجم می‌گفت کدام شماره ثبت شده است. حالا هر دو
+        // مسیر یک کار انجام می‌دهند و شمارندهٔ ضدحدس هم برای شمارهٔ ناموجود اعمال می‌شود.
+        // نرمال‌سازی مثل مسیر وب است (ارقام فارسی/عربی) تا هش و جست‌وجوی کاربر بخواند.
         phoneNumber = PersianSearch.NormalizePhone(phoneNumber);
+
+        if (!await _otpService.VerifyOtpAsync(phoneNumber, code, OtpPurpose.ApiToken))
+            return new TokenIssueResult(false);
 
         var user = await _userManager.FindByNameAsync(phoneNumber);
         if (user is null)
-            return new TokenIssueResult(false);
-
-        if (!await _otpService.VerifyOtpAsync(phoneNumber, code))
             return new TokenIssueResult(false);
 
         var issued = await IssueAsync(user.Id, deviceName);
@@ -106,9 +122,18 @@ public class ApiTokenService : IApiTokenService
     public async Task<TokenIssueResult> LoginWithPasswordAndIssueTokenAsync(
         string userName, string password, string? deviceName)
     {
+        // ورودی بلند پیش از کوئری/هش رد می‌شود (سقف ستون‌های Identity و هزینهٔ PBKDF2).
+        if (!AuthInput.IsWithinLengthBounds(userName, password))
+        {
+            _logger.LogWarning("API password login failed: input exceeds length bounds");
+            return new TokenIssueResult(false);
+        }
+
         var user = await FindByUserNameOrEmailAsync(userName);
         if (user is null)
         {
+            // همان هزینهٔ محاسباتیِ مسیرِ کاربرِ موجود تا زمان پاسخ، وجود حساب را لو ندهد.
+            _passwordHasher.VerifyHashedPassword(new ApplicationUser(), DummyPasswordHash, password);
             _logger.LogWarning("API password login failed: no user found");
             return new TokenIssueResult(false);
         }
@@ -153,6 +178,9 @@ public class ApiTokenService : IApiTokenService
         await _unitOfWork.CompleteAsync();
 
         _logger.LogInformation("API token issued for user {UserId}", userId);
+        if (_audit is not null)
+            await _audit.LogEventAsync("token.issued", null,
+                $"توکن API برای دستگاه «{normalizedDevice ?? "نامشخص"}» صادر شد.", actorId: userId);
         return (raw, expiresAt);
     }
 
@@ -162,12 +190,20 @@ public class ApiTokenService : IApiTokenService
             return null;
 
         var trimmed = token.Trim();
-        // توکن‌های قدیمیِ «بدون pepper» هم پذیرفته می‌شوند تا چرخش pepper نشست جاری
-        // را نشکند — ولی فقط وقتی pepper واقعاً تنظیم است (وگرنه همان lookup اول کافی است).
         var pepperedHash = await HashTokenAsync(trimmed);
         var record = await _tokens.GetByHashAsync(pepperedHash);
-        if (record is null && !string.Equals(pepperedHash, HashToken(trimmed, pepper: null), StringComparison.Ordinal))
-            record = await _tokens.GetByHashAsync(HashToken(trimmed, pepper: null));
+
+        // مسیر گذارِ «هش بدون pepper» فقط با کلید صریح Security:AllowLegacyUnpepperedHashes
+        // باز می‌شود؛ پیش‌فرض بسته. توکن ۲۵۶ بیتی است پس ریسک حدس ندارد، ولی پذیرفتن
+        // همیشگیِ هش بدون pepper یعنی یک نشت دیتابیس بدون نیاز به pepper کافی است.
+        // بعد از چرخش pepper باید خاموش شود.
+        if (record is null && _configuration.GetValue<bool>("Security:AllowLegacyUnpepperedHashes"))
+        {
+            var legacyHash = HashToken(trimmed, pepper: null);
+            if (!string.Equals(pepperedHash, legacyHash, StringComparison.Ordinal))
+                record = await _tokens.GetByHashAsync(legacyHash);
+        }
+
         if (record is null || record.IsRevoked)
             return null;
 
@@ -207,6 +243,8 @@ public class ApiTokenService : IApiTokenService
         token.IsRevoked = true;
         token.RevokedAtUtc = _clock.GetUtcNow().UtcDateTime;
         await _unitOfWork.CompleteAsync();
+        if (_audit is not null)
+            await _audit.LogEventAsync("token.revoked", null, $"توکن API #{tokenId} لغو شد.", actorId: userId);
         return true;
     }
 
@@ -220,6 +258,9 @@ public class ApiTokenService : IApiTokenService
             token.RevokedAtUtc = now;
         }
         await _unitOfWork.CompleteAsync();
+        if (_audit is not null && tokens.Count > 0)
+            await _audit.LogEventAsync("token.revoked-all", null,
+                $"{tokens.Count} توکن API لغو شد (خروج از همهٔ دستگاه‌ها).", actorId: userId);
         return tokens.Count;
     }
 

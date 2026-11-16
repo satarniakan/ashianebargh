@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Antiforgery;
 using Ashianebargh.Application.DTOs;
 using Ashianebargh.Application.Services;
 using Microsoft.AspNetCore.Mvc;
+using Ashianebargh.Domain.Entities;
 using Ashianebargh.Domain.Interfaces;
 
 namespace Ashianebargh.App.Endpoints;
@@ -17,16 +18,30 @@ public static class AccountEndpoints
     public static IEndpointRouteBuilder MapAccountEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapPost("/Account/Login", async (
+            HttpContext httpContext,
             IAuthService authService,
-            [FromForm] string email,
-            [FromForm] string password) =>
+            ICaptchaValidator captcha,
+            [FromForm] string userName,
+            [FromForm] string password,
+            [FromForm(Name = "cf-turnstile-response")] string? captchaToken) =>
         {
-            var result = await authService.LoginWithPasswordAsync(email, password);
+            // کپچا روی ورود با رمز هم لازم است: محدودیت نرخ IP-محور است، پس مهاجم با
+            // IPهای چرخان می‌توانست رمز یک حساب را بمباران کند. قفل موقتِ Identity هم
+            // فقط پس از ۵ تلاشِ پیاپی روی همان حساب اثر می‌کند، نه روی حدسِ توزیع‌شده.
+            if (!await captcha.ValidateAsync(captchaToken,
+                    httpContext.Connection.RemoteIpAddress?.ToString()))
+            {
+                return Results.Redirect("/login-password?error=captcha");
+            }
+
+            // FindByUserNameOrEmailAsync می‌تواند ایمیل، شماره یا هر UserName دیگر را
+            // پیدا کند، پس اینجا هیچ قالب مشخصی روی شناسهٔ ورود بررسی نمی‌شود.
+            var result = await authService.LoginWithPasswordAsync(userName, password);
 
             return result.Succeeded
                 ? Results.Redirect("/")
                 : Results.Redirect("/login-password?error=1");
-        }).WithMetadata(new RequireAntiforgeryTokenAttribute()).RequireRateLimiting("login");
+        }).WithMetadata(new RequireAntiforgeryTokenAttribute()).RequireRateLimiting("login").AllowAnonymous();
 
         app.MapPost("/Account/RequestOtp", async (
             HttpContext httpContext,
@@ -51,13 +66,24 @@ public static class AccountEndpoints
                 // مثلاً شماره به‌خاطر تلاش‌های ناموفقِ زیاد موقتاً قفل شده است
                 return Results.Redirect($"/login?error={Uri.EscapeDataString(ex.Message)}");
             }
-        }).WithMetadata(new RequireAntiforgeryTokenAttribute()).RequireRateLimiting("otp-request");
+        }).WithMetadata(new RequireAntiforgeryTokenAttribute()).RequireRateLimiting("otp-request").AllowAnonymous();
 
         app.MapPost("/Account/VerifyOtp", async (
+            HttpContext httpContext,
             IAuthService authService,
+            ICaptchaValidator captcha,
             [FromForm] string phoneNumber,
-            [FromForm] string code) =>
+            [FromForm] string code,
+            [FromForm(Name = "cf-turnstile-response")] string? captchaToken) =>
         {
+            // کپچا پیش از تأیید کد بررسی می‌شود تا در صورت شکست، کدِ یک‌بارمصرفِ کاربر
+            // نسوزد. سقفِ حدسِ کد فقط IP-محور بود؛ با چرخش IP می‌شد فضای ۶ رقمی را جست.
+            if (!await captcha.ValidateAsync(captchaToken,
+                    httpContext.Connection.RemoteIpAddress?.ToString()))
+            {
+                return Results.Redirect($"/verify-otp?phone={Uri.EscapeDataString(phoneNumber)}&error=captcha");
+            }
+
             var result = await authService.VerifyOtpAsync(phoneNumber, code);
 
             if (!result.Succeeded)
@@ -68,7 +94,7 @@ public static class AccountEndpoints
             return result.IsNewUser
                 ? Results.Redirect("/profile?welcome=true")
                 : Results.Redirect("/");
-        }).WithMetadata(new RequireAntiforgeryTokenAttribute()).RequireRateLimiting("otp-verify");
+        }).WithMetadata(new RequireAntiforgeryTokenAttribute()).RequireRateLimiting("otp-verify").AllowAnonymous();
 
         app.MapPost("/Account/UpdateProfile", async (
             HttpContext httpContext,
@@ -93,7 +119,7 @@ public static class AccountEndpoints
                 ProfileUpdateStatus.UserNotFound => Results.Redirect("/login"),
                 _ => Results.Redirect($"/profile?error={result.Status}")
             };
-        }).WithMetadata(new RequireAntiforgeryTokenAttribute()).RequireRateLimiting("profile");
+        }).WithMetadata(new RequireAntiforgeryTokenAttribute()).RequireRateLimiting("profile").RequireAuthorization();
 
         // مرحلهٔ ۱ «فراموشی/تعیین رمز موبایل»: کد پیامکی می‌فرستد و به صفحهٔ تعیین رمز می‌رود.
         app.MapPost("/Account/RequestPasswordReset", async (
@@ -111,14 +137,14 @@ public static class AccountEndpoints
                     return Results.Redirect("/reset-password?error=captcha");
                 }
 
-                await authService.RequestOtpAsync(phoneNumber);
+                await authService.RequestOtpAsync(phoneNumber, OtpPurpose.PasswordReset);
                 return Results.Redirect($"/reset-password?phone={Uri.EscapeDataString(phoneNumber)}");
             }
             catch (Ashianebargh.Domain.Exceptions.BusinessRuleException ex)
             {
                 return Results.Redirect($"/reset-password?error={Uri.EscapeDataString(ex.Message)}");
             }
-        }).WithMetadata(new RequireAntiforgeryTokenAttribute()).RequireRateLimiting("otp-request");
+        }).WithMetadata(new RequireAntiforgeryTokenAttribute()).RequireRateLimiting("otp-request").AllowAnonymous();
 
         // مرحلهٔ ۲: کد + رمز جدید را می‌گیرد و رمز را تعیین می‌کند (سرویس، کد را می‌سوزاند).
         app.MapPost("/Account/ResetPassword", async (
@@ -143,13 +169,13 @@ public static class AccountEndpoints
                 _ =>
                     Results.Redirect($"/reset-password?phone={Uri.EscapeDataString(phoneNumber)}&error=failed")
             };
-        }).WithMetadata(new RequireAntiforgeryTokenAttribute()).RequireRateLimiting("otp-verify");
+        }).WithMetadata(new RequireAntiforgeryTokenAttribute()).RequireRateLimiting("otp-verify").AllowAnonymous();
 
         app.MapPost("/logout", async (IAuthService authService) =>
         {
             await authService.LogoutAsync();
             return Results.Redirect("/login");
-        }).WithMetadata(new RequireAntiforgeryTokenAttribute());
+        }).WithMetadata(new RequireAntiforgeryTokenAttribute()).AllowAnonymous();
 
         // توکن ضدجعل (CSRF) برای fetchهای JS: کوکی غیرHttpOnly می‌گذارد تا
         // ashianebarghApi.post آن را در هدر X-XSRF-TOKEN بفرستد.
@@ -171,7 +197,7 @@ public static class AccountEndpoints
                     MaxAge = TimeSpan.FromHours(8)
                 });
             return Results.NoContent();
-        });
+        }).AllowAnonymous();
 
         return app;
     }

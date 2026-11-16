@@ -3,7 +3,9 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Ashianebargh.Application.DTOs;
 using Ashianebargh.Application.Queries;
+using Ashianebargh.Application.Validators;
 using Ashianebargh.Domain.Identity;
+using Ashianebargh.Domain.Interfaces;
 using Ashianebargh.Domain.Queries;
 
 namespace Ashianebargh.Application.Services;
@@ -31,14 +33,16 @@ public class UserAdminService : IUserAdminService
     private readonly RoleManager<IdentityRole> _roleManager;
     private readonly IAuditService _audit;
     private readonly IHttpContextAccessor _httpContext;
+    private readonly IAshianebarghUnitOfWork _unitOfWork;
 
     public UserAdminService(UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager,
-        IAuditService audit, IHttpContextAccessor httpContext)
+        IAuditService audit, IHttpContextAccessor httpContext, IAshianebarghUnitOfWork unitOfWork)
     {
         _userManager = userManager;
         _roleManager = roleManager;
         _audit = audit;
         _httpContext = httpContext;
+        _unitOfWork = unitOfWork;
     }
 
     /// <summary>عامل فعلی (ادمین انجام‌دهنده) برای رد حسابرسی؛ بیرون از درخواست HTTP تهی است.</summary>
@@ -132,21 +136,58 @@ public class UserAdminService : IUserAdminService
                 });
         }
 
-        if (currentRoles.Any())
+        // نوشتن نقش‌ها و باطل‌کردن نشست باید اتمیک باشد. نقش‌ها و مجوزها هنگام ورود داخل
+        // کوکی احراز هویت پخته می‌شوند (AppUserClaimsPrincipalFactory)، پس بدون تغییر
+        // security stamp کاربرِ عزل‌شده تا لاگین بعدی همان دسترسی قبلی را نگه می‌دارد —
+        // یعنی «حذف نقش ادمین» عملاً بی‌اثر می‌ماند. از طرف دیگر اگر وسط کار خطایی بدهد،
+        // نقش‌ها نباید نیمه‌کاره بمانند.
+        IdentityResult? failure = null;
+        try
         {
-            var removeResult = await _userManager.RemoveFromRolesAsync(user, currentRoles);
-            if (!removeResult.Succeeded) return removeResult;
-        }
+            await _unitOfWork.ExecuteInTransactionAsync(async () =>
+            {
+                if (currentRoles.Any())
+                {
+                    var removeResult = await _userManager.RemoveFromRolesAsync(user, currentRoles);
+                    if (!removeResult.Succeeded)
+                    {
+                        failure = removeResult;
+                        throw new AdminUpdateAbortedException();
+                    }
+                }
 
-        if (roleNames.Any())
+                if (roleNames.Any())
+                {
+                    var addResult = await _userManager.AddToRolesAsync(user, roleNames);
+                    if (!addResult.Succeeded)
+                    {
+                        failure = addResult;
+                        throw new AdminUpdateAbortedException();
+                    }
+                }
+
+                var stampResult = await _userManager.UpdateSecurityStampAsync(user);
+                if (!stampResult.Succeeded)
+                {
+                    failure = stampResult;
+                    throw new AdminUpdateAbortedException();
+                }
+            });
+        }
+        catch (AdminUpdateAbortedException)
         {
-            var addResult = await _userManager.AddToRolesAsync(user, roleNames);
-            if (!addResult.Succeeded) return addResult;
+            _unitOfWork.ClearChangeTracker();
+            return failure!;
         }
 
         await _audit.LogEventAsync("user.roles-changed", ActorName,
             $"نقش‌های کاربر {user.PhoneNumber} به «{string.Join("، ", roleNames)}» تغییر کرد.");
         return IdentityResult.Success;
+    }
+
+    /// <summary>فقط برای شکستن تراکنش پس از ثبت نتیجهٔ Identity؛ بیرون نمی‌رود.</summary>
+    private sealed class AdminUpdateAbortedException : Exception
+    {
     }
 
     public async Task<IdentityResult> CreateUserAsync(CreateUserDto model)
@@ -157,8 +198,12 @@ public class UserAdminService : IUserAdminService
                 { Description = "نام کامل نمی‌تواند بیشتر از ۱۰۰ کاراکتر باشد." });
         }
 
-        // شماره همیشه با ارقام انگلیسی ذخیره می‌شود تا جست‌وجو و ورود یکدست باشد
-        var phone = PersianSearch.NormalizePhone(model.PhoneNumber);
+        // شماره همیشه با ارقام انگلیسی ذخیره می‌شود تا جست‌وجو و ورود یکدست باشد.
+        // قالب هم اینجا بررسی می‌شود نه فقط در فرم: UserName همان شماره است و ورود
+        // با OTP بر اساس آن جست‌وجو می‌کند؛ شمارهٔ بی‌قالب یعنی حسابی که نمی‌تواند وارد شود.
+        var phone = AuthInput.NormalizeValidPhone(model.PhoneNumber);
+        if (phone is null)
+            return IdentityResult.Failed(new IdentityError { Description = "شماره موبایل معتبر نیست." });
 
         if (!string.IsNullOrWhiteSpace(model.Email))
         {
@@ -220,7 +265,10 @@ public class UserAdminService : IUserAdminService
                 { Description = "نام کامل نمی‌تواند بیشتر از ۱۰۰ کاراکتر باشد." });
         }
 
-        var phone = PersianSearch.NormalizePhone(model.PhoneNumber);
+        var phone = AuthInput.NormalizeValidPhone(model.PhoneNumber);
+        if (phone is null)
+            return IdentityResult.Failed(new IdentityError { Description = "شماره موبایل معتبر نیست." });
+
         var phoneOwner = await _userManager.FindByNameAsync(phone);
         if (phoneOwner is not null && phoneOwner.Id != user.Id)
             return IdentityResult.Failed(new IdentityError { Description = "این شماره موبایل برای کاربر دیگری ثبت شده است." });
@@ -239,14 +287,38 @@ public class UserAdminService : IUserAdminService
         user.UserName = phone;
         user.Email = string.IsNullOrWhiteSpace(email) ? null : email;
 
-        var updateResult = await _userManager.UpdateAsync(user);
-        if (updateResult.Succeeded)
+        // شماره/UserName همان شناسهٔ ورود است و نام کاربری داخل کوکی نشست هم می‌نشیند؛
+        // بدون باطل‌کردن stamp، کوکی قدیمی همچنان هویت قبلی را نشان می‌دهد.
+        IdentityResult? failure = null;
+        try
         {
-            await _audit.LogEventAsync("user.updated", ActorName,
-                $"کاربر {phone} ویرایش شد.");
+            await _unitOfWork.ExecuteInTransactionAsync(async () =>
+            {
+                var updateResult = await _userManager.UpdateAsync(user);
+                if (!updateResult.Succeeded)
+                {
+                    failure = updateResult;
+                    throw new AdminUpdateAbortedException();
+                }
+
+                var stampResult = await _userManager.UpdateSecurityStampAsync(user);
+                if (!stampResult.Succeeded)
+                {
+                    failure = stampResult;
+                    throw new AdminUpdateAbortedException();
+                }
+            });
+        }
+        catch (AdminUpdateAbortedException)
+        {
+            _unitOfWork.ClearChangeTracker();
+            return failure!;
         }
 
-        return updateResult;
+        await _audit.LogEventAsync("user.updated", ActorName,
+            $"کاربر {phone} ویرایش شد.");
+
+        return IdentityResult.Success;
     }
 
     public async Task<IdentityResult> DeleteUserAsync(string userId, string currentUserId)
@@ -271,6 +343,8 @@ public class UserAdminService : IUserAdminService
                 });
         }
 
+        // حذف کاربر خودش نشست را باطل می‌کند: SecurityStampValidator در بازاعتبارسنجی،
+        // کاربر را پیدا نمی‌کند و کوکی را رد می‌کند — پس اینجا stamp لازم نیست.
         var deleteResult = await _userManager.DeleteAsync(user);
         if (deleteResult.Succeeded)
         {

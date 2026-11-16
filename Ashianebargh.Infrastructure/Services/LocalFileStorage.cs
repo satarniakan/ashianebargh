@@ -26,12 +26,35 @@ namespace Ashianebargh.Infrastructure.Services;
 public class LocalFileStorage : IFileStorage
 {
     private const int CopyBufferSize = 81920;
+    private const int MagicHeaderLength = 16;
 
     private readonly IConfiguration _configuration;
     private readonly string _rootPath;
     private readonly long _maxFileSizeBytes;
     private readonly long _maxFileSizeMb;
     private readonly HashSet<string> _allowedExtensions;
+
+    // امضای بایتیِ هر پسوند (null = بایتِ دلخواه). فقط پسوندهای دارای امضا بررسی
+    // می‌شوند؛ پسوندِ بدون امضا (مثل txt) از این بررسی رد می‌شود تا سازگار بماند.
+    // این دفاع در عمق است: جلوی آپلودِ HTML/اسکریپتِ نقاب‌دار به‌جای تصویر/PDF را می‌گیرد.
+    private static readonly Dictionary<string, byte?[][]> MagicSignatures = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["jpg"] = new[] { new byte?[] { 0xFF, 0xD8, 0xFF } },
+        ["jpeg"] = new[] { new byte?[] { 0xFF, 0xD8, 0xFF } },
+        ["png"] = new[] { new byte?[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A } },
+        ["gif"] = new[] { Sig("GIF87a"), Sig("GIF89a") },
+        ["bmp"] = new[] { Sig("BM") },
+        ["webp"] = new[] { new byte?[] { (byte)'R', (byte)'I', (byte)'F', (byte)'F', null, null, null, null, (byte)'W', (byte)'E', (byte)'B', (byte)'P' } },
+        ["pdf"] = new[] { Sig("%PDF") },
+        ["mp3"] = new[] { Sig("ID3"), new byte?[] { 0xFF, 0xFB }, new byte?[] { 0xFF, 0xF3 }, new byte?[] { 0xFF, 0xF2 }, new byte?[] { 0xFF, 0xE3 } },
+        ["mp4"] = new[] { new byte?[] { null, null, null, null, (byte)'f', (byte)'t', (byte)'y', (byte)'p' } },
+        ["docx"] = new[] { new byte?[] { 0x50, 0x4B, 0x03, 0x04 } },
+        ["xlsx"] = new[] { new byte?[] { 0x50, 0x4B, 0x03, 0x04 } },
+        ["pptx"] = new[] { new byte?[] { 0x50, 0x4B, 0x03, 0x04 } },
+        ["zip"] = new[] { new byte?[] { 0x50, 0x4B, 0x03, 0x04 }, new byte?[] { 0x50, 0x4B, 0x05, 0x06 } }
+    };
+
+    private static byte?[] Sig(string ascii) => ascii.Select(c => (byte?)c).ToArray();
 
     public LocalFileStorage(IConfiguration configuration)
     {
@@ -68,6 +91,10 @@ public class LocalFileStorage : IFileStorage
         if (!_allowedExtensions.Contains(extensionWithoutDot))
             throw new ArgumentException($"پسوند '{extensionWithoutDot}' مجاز نیست و فایل نمی‌تواند ذخیره شود.", nameof(fileName));
 
+        // contentType اعلامیِ مرورگر قابل جعل است؛ اگر از نوع وب/اجرایی باشد رد می‌کنیم
+        // (دفاع در عمق کنار بررسی magic-byte). هیچ‌کدام از پسوندهای مجاز وب/اجرایی نیستند.
+        RejectDangerousContentType(contentType);
+
         var storageId = $"{Guid.NewGuid()}{extension}";
         var fullPath = ResolveWithinRoot(Path.Combine(Hash8(ownerId), fileType, storageId));
 
@@ -82,8 +109,28 @@ public class LocalFileStorage : IFileStorage
                 tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None,
                 bufferSize: CopyBufferSize, FileOptions.Asynchronous))
             {
+                // سرآیند را اول می‌خوانیم تا پیش از نوشتن، امضای بایتی بررسی شود.
+                // stream ممکن است forward-only باشد؛ پس header را جدا نگه می‌داریم.
+                var header = new byte[MagicHeaderLength];
+                var headerLen = 0;
+                while (headerLen < MagicHeaderLength)
+                {
+                    var n = await stream.ReadAsync(header.AsMemory(headerLen, MagicHeaderLength - headerLen));
+                    if (n == 0) break;
+                    headerLen += n;
+                }
+
+                if (headerLen == 0)
+                    throw new ArgumentException("فایل خالی است.", nameof(stream));
+
+                ValidateMagicBytes(extensionWithoutDot, header.AsSpan(0, headerLen), fileName);
+
+                long total = headerLen;
+                if (total > _maxFileSizeBytes)
+                    throw new ArgumentException($"حجم فایل از {MaxFileSizeLabel()} بزرگ شده است.", nameof(fileName));
+                await target.WriteAsync(header.AsMemory(0, headerLen));
+
                 var buffer = new byte[CopyBufferSize];
-                long total = 0;
                 int read;
                 while ((read = await stream.ReadAsync(buffer)) > 0)
                 {
@@ -94,9 +141,6 @@ public class LocalFileStorage : IFileStorage
 
                     await target.WriteAsync(buffer.AsMemory(0, read));
                 }
-
-                if (total == 0)
-                    throw new ArgumentException("فایل خالی است.", nameof(stream));
             }
 
             File.Move(tempPath, fullPath);
@@ -109,6 +153,44 @@ public class LocalFileStorage : IFileStorage
         }
 
         return storageId;
+    }
+
+    private static void RejectDangerousContentType(string? contentType)
+    {
+        if (string.IsNullOrWhiteSpace(contentType))
+            return;
+
+        var ct = contentType.Trim().ToLowerInvariant();
+        if (ct is "text/html" or "application/xhtml+xml" or "text/javascript"
+            or "application/javascript" or "image/svg+xml" or "application/x-httpd-php")
+            throw new ArgumentException("نوع محتوای اعلامی با فایل‌های مجاز همخوانی ندارد.", nameof(contentType));
+    }
+
+    private static void ValidateMagicBytes(string extension, ReadOnlySpan<byte> header, string fileName)
+    {
+        if (!MagicSignatures.TryGetValue(extension, out var signatures))
+            return; // پسوندِ بدون امضای شناخته‌شده: بررسی نمی‌شود.
+
+        foreach (var signature in signatures)
+        {
+            if (header.Length < signature.Length)
+                continue;
+
+            var match = true;
+            for (var i = 0; i < signature.Length; i++)
+            {
+                var expected = signature[i];
+                if (expected.HasValue && header[i] != expected.Value)
+                {
+                    match = false;
+                    break;
+                }
+            }
+
+            if (match) return;
+        }
+
+        throw new ArgumentException("محتوای فایل با پسوند آن همخوانی ندارد.", nameof(fileName));
     }
 
     public Task DeleteAsync(string ownerId, string fileType, string storageId)

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Ashianebargh.Application.Helpers;
 using Ashianebargh.Application.Services;
 using Ashianebargh.Domain.Identity;
 using Ashianebargh.Domain.Interfaces;
@@ -44,7 +45,8 @@ public class VapidPushSender : IPushSender
             || string.IsNullOrWhiteSpace(publicKey)
             || string.IsNullOrWhiteSpace(privateKey))
         {
-            _logger.LogWarning("Push keys not configured; skipping push to {Endpoint}", subscription.Endpoint);
+            _logger.LogWarning("Push keys not configured; skipping push to {Endpoint}",
+                PiiMask.PushEndpoint(subscription.Endpoint));
             return;
         }
 

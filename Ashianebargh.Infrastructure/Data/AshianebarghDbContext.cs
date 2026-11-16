@@ -75,13 +75,26 @@ public class AshianebarghDbContext : IdentityDbContext<ApplicationUser>
             e.Property(x => x.EventType).HasMaxLength(100).IsRequired();
             e.Property(x => x.UserEmail).HasMaxLength(256);
             e.Property(x => x.Details).IsRequired();
+            // شناسهٔ کاربر Identity از نوع nvarchar(450) است؛ IP هم سقف ۶۴ (IPv6 نقشه‌شده).
+            e.Property(x => x.ActorId).HasMaxLength(450);
+            e.Property(x => x.IpAddress).HasMaxLength(64);
             e.HasIndex(x => x.OccurredAt);
+            // کوئری «این کاربر چه کرد؟» بدون اسکن کل جدول audit.
+            e.HasIndex(x => x.ActorId);
         });
 
         builder.Entity<OtpCode>(e =>
         {
             e.HasKey(x => x.Id);
-            e.HasIndex(x => x.PhoneNumber);
+
+            // طول صریح: بدون این، مایگریشن nvarchar(max) می‌ساخت و کوئری داغِ
+            // تأیید (شماره + هدف + هش) نمی‌توانست ایندکس داشته باشد ⇒ اسکن جدول
+            // به‌ازای هر تلاش، که زیر بار حدس‌زدن هزینه‌ساز است.
+            e.Property(x => x.PhoneNumber).HasMaxLength(32).IsRequired();
+            e.Property(x => x.Code).HasMaxLength(64).IsRequired();
+            e.Property(x => x.Purpose).HasConversion<int>();
+
+            e.HasIndex(x => new { x.PhoneNumber, x.Purpose, x.Code });
             e.HasIndex(x => x.ExpiresAt);
         });
 

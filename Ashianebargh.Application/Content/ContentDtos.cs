@@ -1,24 +1,24 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace Ashianebargh.Application.Content;
 
-// ---------- ط¯ط³طھظ‡â€Œط¨ظ†ط¯غŒ ----------
+// ---------- دسته‌بندی ----------
 
 public sealed class CategoryEditDto
 {
     public int Id { get; set; }
 
-    [Required(ErrorMessage = "ظ†ط§ظ… ط¯ط³طھظ‡ ط±ط§ ظˆط§ط±ط¯ ع©ظ†غŒط¯.")]
-    [StringLength(150, ErrorMessage = "ظ†ط§ظ… ط¯ط³طھظ‡ ط­ط¯ط§ع©ط«ط± غ±غµغ° ظ†ظˆغŒط³ظ‡ ط§ط³طھ.")]
+    [Required(ErrorMessage = "نام دسته را وارد کنید.")]
+    [StringLength(150, ErrorMessage = "نام دسته حداکثر ۱۵۰ نویسه است.")]
     public string Name { get; set; } = string.Empty;
 
-    [StringLength(150, ErrorMessage = "ظ†ط§ظ…ع© ط­ط¯ط§ع©ط«ط± غ±غµغ° ظ†ظˆغŒط³ظ‡ ط§ط³طھ.")]
+    [StringLength(150, ErrorMessage = "نامک حداکثر ۱۵۰ نویسه است.")]
     public string? Slug { get; set; }
 
-    [StringLength(1000, ErrorMessage = "طھظˆط¶غŒط­ ط­ط¯ط§ع©ط«ط± غ±غ°غ°غ° ظ†ظˆغŒط³ظ‡ ط§ط³طھ.")]
+    [StringLength(1000, ErrorMessage = "توضیح حداکثر ۱۰۰۰ نویسه است.")]
     public string? Description { get; set; }
 
-    [Range(0, 100000, ErrorMessage = "طھط±طھغŒط¨ ط¨ط§غŒط¯ ط¨غŒظ† غ° طھط§ غ±غ°غ°ظ¬غ°غ°غ° ط¨ط§ط´ط¯.")]
+    [Range(0, 100000, ErrorMessage = "ترتیب باید بین ۰ تا ۱۰۰٬۰۰۰ باشد.")]
     public int SortOrder { get; set; }
 
     public bool IsActive { get; set; } = true;
@@ -28,30 +28,30 @@ public sealed record CategoryListItemDto(
     int Id, string Name, string Slug, string? Description,
     bool IsActive, int SortOrder, int ProductCount, string? ImageStorageId);
 
-// ---------- ط¨ط±ع†ط³ط¨ ----------
+// ---------- برچسب ----------
 
 public sealed class TagEditDto
 {
     public int Id { get; set; }
 
-    [Required(ErrorMessage = "ظ†ط§ظ… ط¨ط±ع†ط³ط¨ ط±ط§ ظˆط§ط±ط¯ ع©ظ†غŒط¯.")]
-    [StringLength(100, ErrorMessage = "ظ†ط§ظ… ط¨ط±ع†ط³ط¨ ط­ط¯ط§ع©ط«ط± غ±غ°غ° ظ†ظˆغŒط³ظ‡ ط§ط³طھ.")]
+    [Required(ErrorMessage = "نام برچسب را وارد کنید.")]
+    [StringLength(100, ErrorMessage = "نام برچسب حداکثر ۱۰۰ نویسه است.")]
     public string Name { get; set; } = string.Empty;
 
-    [StringLength(100, ErrorMessage = "ظ†ط§ظ…ع© ط­ط¯ط§ع©ط«ط± غ±غ°غ° ظ†ظˆغŒط³ظ‡ ط§ط³طھ.")]
+    [StringLength(100, ErrorMessage = "نامک حداکثر ۱۰۰ نویسه است.")]
     public string? Slug { get; set; }
 }
 
 public sealed record TagListItemDto(int Id, string Name, string Slug, int ProductCount);
 
-// ---------- ظ…ط­طµظˆظ„ ----------
+// ---------- محصول ----------
 
 public sealed class ProductEditDto
 {
     public int Id { get; set; }
 
-    [Required(ErrorMessage = "ظ†ط§ظ… ظ…ط­طµظˆظ„ ط±ط§ ظˆط§ط±ط¯ ع©ظ†غŒط¯.")]
-    [StringLength(200, ErrorMessage = "ظ†ط§ظ… ظ…ط­طµظˆظ„ ط­ط¯ط§ع©ط«ط± غ²غ°غ° ظ†ظˆغŒط³ظ‡ ط§ط³طھ.")]
+    [Required(ErrorMessage = "نام محصول را وارد کنید.")]
+    [StringLength(200, ErrorMessage = "نام محصول حداکثر ۲۰۰ نویسه است.")]
     public string Name { get; set; } = string.Empty;
 
     /// <summary>Product name in English (for display when site language is English)</summary>
@@ -96,6 +96,12 @@ public sealed class ProductEditDto
     public string? MainImageStorageId { get; set; }
 
     public List<ProductFileDto> Files { get; set; } = new();
+
+    /// <summary>ردیف‌های مشخصات فنی (عنوان/مقدار) که در سایت جدول می‌شوند.</summary>
+    public List<ProductSpecDto> Specs { get; set; } = new();
+
+    /// <summary>تصاویر گالری (به‌جز تصویر اصلی).</summary>
+    public List<ProductImageDto> Images { get; set; } = new();
 }
 
 public sealed record ProductListItemDto(
@@ -106,10 +112,19 @@ public sealed record ProductCardDto(
     int Id, string Name, string NameEn, string Slug, string? Code, string? ShortDescription, string? ShortDescriptionEn, decimal? Price, string? MainImageStorageId, string CategoryName, string CategorySlug);
 
 public sealed record ProductDetailsDto(
-    int Id, string Name, string Slug, string? Code, string CategoryName, string CategorySlug,
-    string? ShortDescription, string? Description, decimal? Price, string? MainImageStorageId,
+    int Id, string Name, string NameEn, string Slug, string? Code, string CategoryName, string CategorySlug,
+    string? ShortDescription, string? ShortDescriptionEn, string? Description, string? DescriptionEn,
+    decimal? Price, string? MainImageStorageId,
     IReadOnlyList<TagDto> Tags,
-    IReadOnlyList<ProductFileDto> Files);
+    IReadOnlyList<ProductFileDto> Files,
+    IReadOnlyList<ProductSpecDto> Specs,
+    IReadOnlyList<ProductImageDto> Images);
+
+/// <summary>یک ردیف مشخصات فنی محصول.</summary>
+public sealed record ProductSpecDto(string Title, string Value);
+
+/// <summary>یک تصویر گالری محصول.</summary>
+public sealed record ProductImageDto(int Id, string StorageId);
 
 public sealed record ProductFileDto(int Id, string FileName, string StorageId, string ContentType, long SizeBytes);
 
@@ -127,6 +142,8 @@ public sealed class ProductFilter
     public int PageSize { get; set; } = 20;
 }
 
+/// <summary>ردیف نقشهٔ سایت: مسیر نسبی و آخرین تغییر (برای lastmod).</summary>
+public sealed record SitemapEntryDto(string Path, DateTime LastModified);
 public sealed class PublicProductFilter
 {
     public string? CategorySlug { get; set; }
@@ -135,36 +152,39 @@ public sealed class PublicProductFilter
     /// <summary>عبارت جست‌وجوی عمومی سایت (نام، کد یا توضیح محصول).</summary>
     public string? Search { get; set; }
 
+    /// <summary>ترتیب نمایش: default | newest | price-asc | price-desc | name.</summary>
+    public string? Sort { get; set; }
+
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = 12;
 }
 
-// ---------- طµظپط­ظ‡ ----------
+// ---------- صفحه ----------
 
 public sealed class PageEditDto
 {
     public int Id { get; set; }
 
-    [Required(ErrorMessage = "ط¹ظ†ظˆط§ظ† طµظپط­ظ‡ ط±ط§ ظˆط§ط±ط¯ ع©ظ†غŒط¯.")]
-    [StringLength(200, ErrorMessage = "ط¹ظ†ظˆط§ظ† ط­ط¯ط§ع©ط«ط± غ²غ°غ° ظ†ظˆغŒط³ظ‡ ط§ط³طھ.")]
+    [Required(ErrorMessage = "عنوان صفحه را وارد کنید.")]
+    [StringLength(200, ErrorMessage = "عنوان حداکثر ۲۰۰ نویسه است.")]
     public string Title { get; set; } = string.Empty;
 
-    /// <summary>ط¹ظ†ظˆط§ظ† ط§ظ†ع¯ظ„غŒط³غŒ طµظپط­ظ‡ (ط¨ط±ط§غŒ ظ†ظ…ط§غŒط´ ظˆظ‚طھغŒ ط²ط¨ط§ظ† ط³ط§غŒطھ ط§ظ†ع¯ظ„غŒط³غŒ ط§ط³طھ)</summary>
-    [StringLength(200, ErrorMessage = "ط¹ظ†ظˆط§ظ† ط§ظ†ع¯ظ„غŒط³غŒ ط­ط¯ط§ع©ط«ط± غ²غ°غ° ظ†ظˆغŒط³ظ‡ ط§ط³طھ.")]
+    /// <summary>عنوان انگلیسی صفحه (برای نمایش وقتی زبان سایت انگلیسی است)</summary>
+    [StringLength(200, ErrorMessage = "عنوان انگلیسی حداکثر ۲۰۰ نویسه است.")]
     public string TitleEn { get; set; } = string.Empty;
 
-    [StringLength(200, ErrorMessage = "ظ†ط§ظ…ع© ط­ط¯ط§ع©ط«ط± غ²غ°غ° ظ†ظˆغŒط³ظ‡ ط§ط³طھ.")]
+    [StringLength(200, ErrorMessage = "نامک حداکثر ۲۰۰ نویسه است.")]
     public string? Slug { get; set; }
 
     public string? Content { get; set; }
 
-    /// <summary>ظ…طھظ† ط§ظ†ع¯ظ„غŒط³غŒ طµظپط­ظ‡ (ط¨ط±ط§غŒ ظ†ظ…ط§غŒط´ ظˆظ‚طھغŒ ط²ط¨ط§ظ† ط³ط§غŒطھ ط§ظ†ع¯ظ„غŒط³غŒ ط§ط³طھ)</summary>
+    /// <summary>متن انگلیسی صفحه (برای نمایش وقتی زبان سایت انگلیسی است)</summary>
     public string? ContentEn { get; set; }
 
     public bool IsPublished { get; set; } = true;
     public bool ShowInMenu { get; set; }
 
-    [Range(0, 100000, ErrorMessage = "طھط±طھغŒط¨ ط¨ط§غŒط¯ ط¨غŒظ† غ° طھط§ غ±غ°غ°ظ¬غ°غ°غ° ط¨ط§ط´ط¯.")]
+    [Range(0, 100000, ErrorMessage = "ترتیب باید بین ۰ تا ۱۰۰٬۰۰۰ باشد.")]
     public int SortOrder { get; set; }
 }
 
@@ -175,11 +195,11 @@ public sealed record PageMenuItemDto(string Title, string TitleEn, string Slug);
 
 public sealed record PageViewDto(string Title, string TitleEn, string Slug, string? Content, string? ContentEn, DateTime? UpdatedAt);
 
-// ---------- طھظ…ط§ط³ ط¨ط§ ظ…ط§ ----------
+// ---------- تماس با ما ----------
 
 public sealed class ContactInfoDto
 {
-    [StringLength(500, ErrorMessage = "ظ†ط´ط§ظ†غŒ ط­ط¯ط§ع©ط«ط± غµغ°غ° ظ†ظˆغŒط³ظ‡ ط§ط³طھ.")]
+    [StringLength(500, ErrorMessage = "نشانی حداکثر ۵۰۰ نویسه است.")]
     public string? Address { get; set; }
 
     [StringLength(100)]
@@ -188,8 +208,8 @@ public sealed class ContactInfoDto
     [StringLength(100)]
     public string? Mobile { get; set; }
 
-    [StringLength(200, ErrorMessage = "ط§غŒظ…غŒظ„ ط­ط¯ط§ع©ط«ط± غ²غ°غ° ظ†ظˆغŒط³ظ‡ ط§ط³طھ.")]
-    [EmailAddress(ErrorMessage = "ط§غŒظ…غŒظ„ ظ…ط¹طھط¨ط± ظ†غŒط³طھ.")]
+    [StringLength(200, ErrorMessage = "ایمیل حداکثر ۲۰۰ نویسه است.")]
+    [EmailAddress(ErrorMessage = "ایمیل معتبر نیست.")]
     public string? Email { get; set; }
 
     [StringLength(200)]
@@ -210,23 +230,23 @@ public sealed class ContactInfoDto
 
 public sealed class ContactFormDto
 {
-    [Required(ErrorMessage = "ظ†ط§ظ… ط±ط§ ظˆط§ط±ط¯ ع©ظ†غŒط¯.")]
-    [StringLength(100, ErrorMessage = "ظ†ط§ظ… ط­ط¯ط§ع©ط«ط± غ±غ°غ° ظ†ظˆغŒط³ظ‡ ط§ط³طھ.")]
+    [Required(ErrorMessage = "نام را وارد کنید.")]
+    [StringLength(100, ErrorMessage = "نام حداکثر ۱۰۰ نویسه است.")]
     public string Name { get; set; } = string.Empty;
 
-    [Required(ErrorMessage = "ط´ظ…ط§ط±ظ‡ طھظ…ط§ط³ ط±ط§ ظˆط§ط±ط¯ ع©ظ†غŒط¯.")]
-    [StringLength(30, ErrorMessage = "ط´ظ…ط§ط±ظ‡ طھظ…ط§ط³ ط­ط¯ط§ع©ط«ط± غ³غ° ظ†ظˆغŒط³ظ‡ ط§ط³طھ.")]
+    [Required(ErrorMessage = "شماره تماس را وارد کنید.")]
+    [StringLength(30, ErrorMessage = "شماره تماس حداکثر ۳۰ نویسه است.")]
     public string Phone { get; set; } = string.Empty;
 
-    [EmailAddress(ErrorMessage = "ط§غŒظ…غŒظ„ ظ…ط¹طھط¨ط± ظ†غŒط³طھ.")]
+    [EmailAddress(ErrorMessage = "ایمیل معتبر نیست.")]
     [StringLength(200)]
     public string? Email { get; set; }
 
     [StringLength(200)]
     public string? Subject { get; set; }
 
-    [Required(ErrorMessage = "ظ…طھظ† ظ¾غŒط§ظ… ط±ط§ ظˆط§ط±ط¯ ع©ظ†غŒط¯.")]
-    [StringLength(2000, ErrorMessage = "ظ…طھظ† ظ¾غŒط§ظ… ط­ط¯ط§ع©ط«ط± غ²غ°غ°غ° ظ†ظˆغŒط³ظ‡ ط§ط³طھ.")]
+    [Required(ErrorMessage = "متن پیام را وارد کنید.")]
+    [StringLength(2000, ErrorMessage = "متن پیام حداکثر ۲۰۰۰ نویسه است.")]
     public string Message { get; set; } = string.Empty;
 }
 

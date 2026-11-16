@@ -1,4 +1,4 @@
-/* ==================== قالب عمومی سایت — الهام‌گرفته از طرح TKS ==================== */
+﻿/* ==================== ظ‚ط§ظ„ط¨ ط¹ظ…ظˆظ…غŒ ط³ط§غŒطھ â€” ط§ظ„ظ‡ط§ظ…â€Œع¯ط±ظپطھظ‡ ط§ط² ط·ط±ط­ TKS ==================== */
 
 .site-shell {
     --site-navy: #0b345b;
@@ -26,7 +26,7 @@
     font-size: 13px;
 }
 
-/* تم تیرهٔ سایت — مستقل از پنل مدیریت، با همان کلید تم سراسری */
+/* طھظ… طھغŒط±ظ‡ظ” ط³ط§غŒطھ â€” ظ…ط³طھظ‚ظ„ ط§ط² ظ¾ظ†ظ„ ظ…ط¯غŒط±غŒطھطŒ ط¨ط§ ظ‡ظ…ط§ظ† ع©ظ„غŒط¯ طھظ… ط³ط±ط§ط³ط±غŒ */
 html[data-theme="dark"] .site-shell {
     --site-ink: #dbe6f5;
     --site-muted: #93a6c1;
@@ -77,7 +77,7 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     padding-inline: clamp(16px, 3.5vw, 56px);
 }
 
-/* ---------- سربرگ ---------- */
+/* ---------- ط³ط±ط¨ط±ع¯ ---------- */
 
 .site-header {
     position: sticky;
@@ -87,7 +87,7 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     background: var(--site-dark);
 }
 
-/* پرش به محتوا — فقط برای کاربر کیبورد/صفحه‌خوان، با فوکوس دیده می‌شود */
+/* ظ¾ط±ط´ ط¨ظ‡ ظ…ط­طھظˆط§ â€” ظپظ‚ط· ط¨ط±ط§غŒ ع©ط§ط±ط¨ط± ع©غŒط¨ظˆط±ط¯/طµظپط­ظ‡â€Œط®ظˆط§ظ†طŒ ط¨ط§ ظپظˆع©ظˆط³ ط¯غŒط¯ظ‡ ظ…غŒâ€Œط´ظˆط¯ */
 .site-skip {
     position: absolute;
     inset-inline-start: 50%;
@@ -168,6 +168,57 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     gap: 2px;
 }
 
+/* سربرگ تک‌سطری است و در تنگنا همهٔ عناصر فشرده می‌شوند. باکس جست‌وجو نباید
+   قربانی شود (با overflow:hidden تا عرض صفر کاملاً ناپدید می‌شد)، پس کش آمدن
+   به منو واگذار شده و منوی بلند به سطر دوم می‌رود (کلاس stacked در SiteLayout).
+   padding/margin جبران‌کنندهٔ جدولِ قرمز زیر لینک فعال است: با اسکرول‌کنترل شدن،
+   overflow-y از visible خارج می‌شود و آن جدول بریده می‌شد. */
+@media (min-width: 1081px) {
+    .site-search {
+        flex-shrink: 0;
+    }
+
+    .site-nav {
+        min-width: 0;
+        overflow-x: auto;
+        scrollbar-width: none;
+        padding-bottom: 24px;
+        margin-bottom: -24px;
+    }
+
+    .site-nav::-webkit-scrollbar {
+        display: none;
+    }
+
+    .site-header--stacked {
+        height: auto;
+    }
+
+    .site-header--stacked .site-header-inner {
+        height: auto;
+        min-height: 86px;
+        flex-wrap: wrap;
+        row-gap: 6px;
+        padding-bottom: 24px;
+    }
+
+    .site-header--stacked .site-nav {
+        order: 4;
+        flex: 1 0 100%;
+        overflow-x: visible;
+        padding-bottom: 0;
+        margin-bottom: 0;
+    }
+
+    .site-header--stacked .site-search {
+        order: 2;
+    }
+
+    .site-header--stacked .site-actions {
+        order: 3;
+    }
+}
+
 .site-nav a {
     position: relative;
     padding: 8px 13px;
@@ -205,6 +256,9 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     align-items: center;
     gap: 8px;
     margin-inline-start: auto;
+    /* دکمه‌ها nowrapاند؛ اگر این گروه فشرده شود سرریز ظاهری می‌سازد. فشردگی باید
+       به منو برسد (overflow-x خودش) نه به این دکمه‌ها. */
+    flex-shrink: 0;
 }
 
 .site-tools {
@@ -213,7 +267,7 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     gap: 6px;
 }
 
-/* جست‌وجوی سریع در هدر */
+/* ط¬ط³طھâ€Œظˆط¬ظˆغŒ ط³ط±غŒط¹ ط¯ط± ظ‡ط¯ط± */
 .site-search {
     display: flex;
     align-items: center;
@@ -268,7 +322,7 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     transition: background 0.16s ease;
 }
 
-/* آیکن باید دقیقاً وسط باکس بنشیند؛ خط‌-base آیکن‌فونت آن را پایین می‌انداخت */
+/* ط¢غŒع©ظ† ط¨ط§غŒط¯ ط¯ظ‚غŒظ‚ط§ظ‹ ظˆط³ط· ط¨ط§ع©ط³ ط¨ظ†ط´غŒظ†ط¯ط› ط®ط·â€Œ-base ط¢غŒع©ظ†â€Œظپظˆظ†طھ ط¢ظ† ط±ط§ ظ¾ط§غŒغŒظ† ظ…غŒâ€Œط§ظ†ط¯ط§ط®طھ */
 .site-search-btn i {
     display: inline-flex;
     align-items: center;
@@ -322,6 +376,8 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     color: #fff;
     font-size: 12.5px;
     font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
     transition: background 0.18s ease, color 0.18s ease;
 }
 
@@ -351,6 +407,8 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     color: #fff;
     font-size: 11.5px;
     font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
     transition: border-color 0.18s ease, background 0.18s ease;
 }
 
@@ -360,17 +418,20 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     color: #fff;
 }
 
-/* ---------- ساختار اصلی ---------- */
+/* ---------- ط³ط§ط®طھط§ط± ط§طµظ„غŒ ---------- */
 
 .site-main {
     flex: 1;
+    /* فوتر خط قرمز ۴px دارد؛ بدون این فاصله، آخرین محتوا (مثل صفحه‌بندی محصولات)
+       به خط می‌چسبد. */
+    padding-bottom: clamp(40px, 6vw, 72px);
 }
 
 .site-shell .site-main > .site-container > .site-empty {
     margin-top: 24px;
 }
 
-/* ---------- هیرو ---------- */
+/* ---------- ظ‡غŒط±ظˆ ---------- */
 
 .site-hero {
     position: relative;
@@ -507,7 +568,7 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     filter: drop-shadow(0 14px 32px rgba(0, 0, 0, 0.35));
 }
 
-/* ---------- نوار مزیت‌ها ---------- */
+/* ---------- ظ†ظˆط§ط± ظ…ط²غŒطھâ€Œظ‡ط§ ---------- */
 
 .site-feats {
     position: relative;
@@ -588,7 +649,7 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     flex: none;
 }
 
-/* ---------- بخش‌ها ---------- */
+/* ---------- ط¨ط®ط´â€Œظ‡ط§ ---------- */
 
 .site-section {
     margin-top: clamp(40px, 5vw, 64px);
@@ -641,7 +702,7 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     color: var(--site-red-dark);
 }
 
-/* ---------- کارت دسته‌بندی ---------- */
+/* ---------- ع©ط§ط±طھ ط¯ط³طھظ‡â€Œط¨ظ†ط¯غŒ ---------- */
 
 .site-cats {
     display: grid;
@@ -671,6 +732,7 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
 }
 
 .site-cat-media {
+    position: relative;
     display: grid;
     place-items: center;
     width: 100%;
@@ -682,8 +744,12 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     overflow: hidden;
 }
 
+/* تصویر باید با absolute پر کند: درصدِ height روی جعبهٔ aspect-ratio به
+   ارتفاع قطعی تبدیل نمی‌شود و img مربعی جایگذاری‌شده با place-items از
+   گوشهٔ شروع سرریز می‌کرد و محصول بریده دیده می‌شد. */
 .site-cat-media img {
-    display: block;
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
     object-fit: cover;
@@ -723,7 +789,7 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     color: #fff;
 }
 
-/* ---------- کارت محصول ---------- */
+/* ---------- ع©ط§ط±طھ ظ…ط­طµظˆظ„ ---------- */
 
 .site-grid {
     display: grid;
@@ -766,6 +832,8 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
 }
 
 .site-product-media img {
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
     padding: 10px;
@@ -851,7 +919,7 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     flex: none;
 }
 
-/* ---------- سرصفحه داخلی و مسیر ---------- */
+/* ---------- ط³ط±طµظپط­ظ‡ ط¯ط§ط®ظ„غŒ ظˆ ظ…ط³غŒط± ---------- */
 
 .site-page-head {
     padding-top: 28px;
@@ -872,7 +940,7 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
 }
 
 .site-breadcrumb a {
-    /* ناحیهٔ لمسی کافی برای موبایل */
+    /* ظ†ط§ط­غŒظ‡ظ” ظ„ظ…ط³غŒ ع©ط§ظپغŒ ط¨ط±ط§غŒ ظ…ظˆط¨ط§غŒظ„ */
     display: inline-flex;
     align-items: center;
     min-height: 30px;
@@ -919,7 +987,7 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     line-height: 1.8;
 }
 
-/* ---------- فهرست محصولات ---------- */
+/* ---------- ظپظ‡ط±ط³طھ ظ…ط­طµظˆظ„ط§طھ ---------- */
 
 .site-catalog {
     display: grid;
@@ -1111,7 +1179,7 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     color: var(--site-red-dark);
 }
 
-/* ---------- صفحه‌بندی ---------- */
+/* ---------- طµظپط­ظ‡â€Œط¨ظ†ط¯غŒ ---------- */
 
 .site-pager {
     display: flex;
@@ -1152,7 +1220,7 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     font-size: 11px;
 }
 
-/* ---------- جزئیات محصول ---------- */
+/* ---------- ط¬ط²ط¦غŒط§طھ ظ…ط­طµظˆظ„ ---------- */
 
 .site-detail-layout {
     display: grid;
@@ -1162,8 +1230,8 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     margin-top: 20px;
 }
 
-/* بدون min-width صفر، آیتم‌های گرید عرض محتوایشان را می‌گیرند و صفحه
-   در موبایل به‌صورت افقی اسکرول می‌کند. */
+/* ط¨ط¯ظˆظ† min-width طµظپط±طŒ ط¢غŒطھظ…â€Œظ‡ط§غŒ ع¯ط±غŒط¯ ط¹ط±ط¶ ظ…ط­طھظˆط§غŒط´ط§ظ† ط±ط§ ظ…غŒâ€Œع¯غŒط±ظ†ط¯ ظˆ طµظپط­ظ‡
+   ط¯ط± ظ…ظˆط¨ط§غŒظ„ ط¨ظ‡â€Œطµظˆط±طھ ط§ظپظ‚غŒ ط§ط³ع©ط±ظˆظ„ ظ…غŒâ€Œع©ظ†ط¯. */
 .site-detail-layout > *,
 .site-catalog > * {
     min-width: 0;
@@ -1292,6 +1360,7 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
 }
 
 .site-detail-media {
+    position: relative;
     display: grid;
     place-items: center;
     aspect-ratio: 4 / 3;
@@ -1302,6 +1371,8 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
 }
 
 .site-detail-media img {
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
     padding: 16px;
@@ -1338,12 +1409,12 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     overflow: hidden;
 }
 
-/* جدول مشخصاتِ محصول (جدول اصلی سایت مبدأ) در موبایل باید افقی اسکرول شود
-   و فشرده نشود؛ عرض کمینه می‌گذارد تا ستون‌ها خوانا بمانند. */
+/* ط¬ط¯ظˆظ„ ظ…ط´ط®طµط§طھظگ ظ…ط­طµظˆظ„ (ط¬ط¯ظˆظ„ ط§طµظ„غŒ ط³ط§غŒطھ ظ…ط¨ط¯ط£) ط¯ط± ظ…ظˆط¨ط§غŒظ„ ط¨ط§غŒط¯ ط§ظپظ‚غŒ ط§ط³ع©ط±ظˆظ„ ط´ظˆط¯
+   ظˆ ظپط´ط±ط¯ظ‡ ظ†ط´ظˆط¯ط› ط¹ط±ط¶ ع©ظ…غŒظ†ظ‡ ظ…غŒâ€Œع¯ط°ط§ط±ط¯ طھط§ ط³طھظˆظ†â€Œظ‡ط§ ط®ظˆط§ظ†ط§ ط¨ظ…ط§ظ†ظ†ط¯. */
 .site-specs-wrap {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-    /* جدول فنیِ سایت مبدأ چپ‌به‌راست است؛ در سایت راست‌چین هم همان ترتیب خوانده شود */
+    /* ط¬ط¯ظˆظ„ ظپظ†غŒظگ ط³ط§غŒطھ ظ…ط¨ط¯ط£ ع†ظ¾â€Œط¨ظ‡â€Œط±ط§ط³طھ ط§ط³طھط› ط¯ط± ط³ط§غŒطھ ط±ط§ط³طھâ€Œع†غŒظ† ظ‡ظ… ظ‡ظ…ط§ظ† طھط±طھغŒط¨ ط®ظˆط§ظ†ط¯ظ‡ ط´ظˆط¯ */
     direction: ltr;
 }
 
@@ -1377,7 +1448,7 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     font-weight: 600;
 }
 
-/* راهنمای اسکرول افقی جدول — فقط در صفحه‌های کوچک */
+/* ط±ط§ظ‡ظ†ظ…ط§غŒ ط§ط³ع©ط±ظˆظ„ ط§ظپظ‚غŒ ط¬ط¯ظˆظ„ â€” ظپظ‚ط· ط¯ط± طµظپط­ظ‡â€Œظ‡ط§غŒ ع©ظˆع†ع© */
 .site-specs-hint {
     display: none;
     margin: 0;
@@ -1447,7 +1518,7 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     line-height: 2.05;
 }
 
-/* فهرست فایل‌های پیوست محصول */
+/* ظپظ‡ط±ط³طھ ظپط§غŒظ„â€Œظ‡ط§غŒ ظ¾غŒظˆط³طھ ظ…ط­طµظˆظ„ */
 .site-files {
     list-style: none;
     margin: 0;
@@ -1527,7 +1598,7 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     color: #fff;
 }
 
-/* جست‌وجوی کنار دسته‌ها در صفحهٔ محصولات */
+/* ط¬ط³طھâ€Œظˆط¬ظˆغŒ ع©ظ†ط§ط± ط¯ط³طھظ‡â€Œظ‡ط§ ط¯ط± طµظپط­ظ‡ظ” ظ…ط­طµظˆظ„ط§طھ */
 .site-side-search {
     display: flex;
     align-items: center;
@@ -1578,7 +1649,7 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     margin-bottom: 0;
 }
 
-/* ---------- تماس با ما ---------- */
+/* ---------- طھظ…ط§ط³ ط¨ط§ ظ…ط§ ---------- */
 
 .site-contact {
     display: grid;
@@ -1771,7 +1842,7 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     border-radius: 16px;
 }
 
-/* ---------- محتوای صفحه (درباره و صفحات پویا) ---------- */
+/* ---------- ظ…ط­طھظˆط§غŒ طµظپط­ظ‡ (ط¯ط±ط¨ط§ط±ظ‡ ظˆ طµظپط­ط§طھ ظ¾ظˆغŒط§) ---------- */
 
 .site-page-head + .content-panel {
     margin-top: 22px;
@@ -1797,7 +1868,7 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     margin-bottom: 0;
 }
 
-/* صفحه‌های محتوایی با تصویرسازی کنار متن */
+/* طµظپط­ظ‡â€Œظ‡ط§غŒ ظ…ط­طھظˆط§غŒغŒ ط¨ط§ طھطµظˆغŒط±ط³ط§ط²غŒ ع©ظ†ط§ط± ظ…طھظ† */
 
 .site-page-body {
     display: grid;
@@ -1835,7 +1906,7 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     background: transparent;
 }
 
-/* ---------- حالت خالی ---------- */
+/* ---------- ط­ط§ظ„طھ ط®ط§ظ„غŒ ---------- */
 
 .site-empty {
     padding: 48px 20px;
@@ -1885,7 +1956,7 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     background: var(--site-red-dark);
 }
 
-/* ---------- پابرگ ---------- */
+/* ---------- ظ¾ط§ط¨ط±ع¯ ---------- */
 
 .site-footer {
     position: relative;
@@ -1983,7 +2054,7 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     color: var(--site-red);
 }
 
-/* ---------- پنل مدیریت محتوا ---------- */
+/* ---------- ظ¾ظ†ظ„ ظ…ط¯غŒط±غŒطھ ظ…ط­طھظˆط§ ---------- */
 
 .product-thumb {
     width: 48px;
@@ -2003,7 +2074,7 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     padding: 0.5rem;
 }
 
-/* ---------- ریسپانسیو ---------- */
+/* ---------- ط±غŒط³ظ¾ط§ظ†ط³غŒظˆ ---------- */
 
 @media (max-width: 1200px) {
     .site-brand-sub {

@@ -40,6 +40,17 @@ else
                 </div>
 
                 <div class="card-panel mt-3">
+                    <h5 class="mb-1">نسخهٔ انگلیسی (اختیاری)</h5>
+                    <div class="form-text mb-3">
+                        اگر خالی باشد، سایت در حالت انگلیسی همان متن فارسی را نشان می‌دهد.
+                    </div>
+                    <AppTextField Label="نام محصول (انگلیسی)" @bind-Value="model.NameEn" />
+                    <AppTextArea Label="توضیح کوتاه (انگلیسی)" @bind-Value="model.ShortDescriptionEn"
+                                 Rows="2" ShowCount />
+                    <AppTextArea Label="توضیحات کامل (انگلیسی)" @bind-Value="model.DescriptionEn" Rows="8" />
+                </div>
+
+                <div class="card-panel mt-3">
                     <h5 class="mb-3">برچسب‌ها</h5>
                     @if (tags.Count == 0)
                     {
@@ -58,6 +69,43 @@ else
                                 </label>
                             }
                         </div>
+                    }
+                </div>
+
+                <div class="card-panel mt-3">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0">مشخصات فنی</h5>
+                        <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AddSpec">
+                            <i class="bi bi-plus-lg me-1"></i>افزودن ردیف
+                        </button>
+                    </div>
+                    @if (model.Specs.Count == 0)
+                    {
+                        <div class="text-body-secondary small">
+                            ردیفی ثبت نشده است. این ردیف‌ها در سایت به‌صورت جدول «مشخصات محصول» نمایش داده می‌شوند.
+                        </div>
+                    }
+                    else
+                    {
+                        @foreach (var (spec, index) in model.Specs.Select((s, i) => (s, i)).ToList())
+                        {
+                            <div class="row g-2 align-items-center mb-2">
+                                <div class="col-4">
+                                    <input class="form-control" placeholder="عنوان (مثلاً جنس بدنه)"
+                                           value="@spec.Title" @onchange="e => SetSpecTitle(index, e.Value?.ToString())" />
+                                </div>
+                                <div class="col-6">
+                                    <input class="form-control" placeholder="مقدار (مثلاً پلی‌کربنات)"
+                                           value="@spec.Value" @onchange="e => SetSpecValue(index, e.Value?.ToString())" />
+                                </div>
+                                <div class="col-2 text-end">
+                                    <button type="button" class="btn btn-sm btn-outline-danger"
+                                            title="حذف ردیف" @onclick="() => RemoveSpec(index)">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        }
                     }
                 </div>
             </div>
@@ -110,6 +158,46 @@ else
                     @if (uploading)
                     {
                         <div class="form-text mt-2">در حال بارگذاری…</div>
+                    }
+                </div>
+
+                <div class="card-panel mt-3">
+                    <h5 class="mb-3">گالری تصاویر</h5>
+                    @if (model.Images.Count == 0)
+                    {
+                        <div class="text-body-secondary small mb-3">تصویر دیگری در گالری نیست.</div>
+                    }
+                    else
+                    {
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                            @foreach (var image in model.Images)
+                            {
+                                <div class="position-relative">
+                                    <img src="/media/products/@image.StorageId" alt="" width="72" height="72"
+                                         class="rounded border" style="object-fit: cover;" loading="lazy" />
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-danger position-absolute top-0 end-0 m-1 py-0 px-1"
+                                            title="حذف تصویر" @onclick="() => DeleteImageAsync(image.Id)">
+                                        <i class="bi bi-x"></i>
+                                    </button>
+                                </div>
+                            }
+                        </div>
+                    }
+                    @if (model.Id > 0)
+                    {
+                        <label class="btn btn-sm btn-outline-primary mb-0" title="JPG، PNG یا WebP">
+                            <i class="bi bi-upload me-1"></i>افزودن تصویر
+                            <InputFile accept=".jpg,.jpeg,.png,.webp,.gif" OnChange="UploadGalleryAsync" style="display:none;" />
+                        </label>
+                        @if (uploadingGallery)
+                        {
+                            <div class="form-text mt-2">در حال بارگذاری…</div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="text-body-secondary small">پس از ذخیرهٔ محصول می‌توانید تصاویر گالری را اضافه کنید.</div>
                     }
                 </div>
 
@@ -171,6 +259,7 @@ else
     private bool saving;
     private bool uploading;
     private bool uploadingFile;
+    private bool uploadingGallery;
 
     private sealed record PendingFile(string StorageId, string FileName, string ContentType, long SizeBytes);
 
@@ -208,6 +297,66 @@ else
         if (model is null) return;
         if (selected && !model.TagIds.Contains(tagId)) model.TagIds.Add(tagId);
         if (!selected) model.TagIds.Remove(tagId);
+    }
+
+    private void AddSpec()
+    {
+        model?.Specs.Add(new ProductSpecDto(string.Empty, string.Empty));
+    }
+
+    private void RemoveSpec(int index)
+    {
+        if (model is null || index < 0 || index >= model.Specs.Count) return;
+        model.Specs.RemoveAt(index);
+    }
+
+    private void SetSpecTitle(int index, string? value)
+    {
+        if (model is null || index < 0 || index >= model.Specs.Count) return;
+        model.Specs[index] = model.Specs[index] with { Title = value ?? string.Empty };
+    }
+
+    private void SetSpecValue(int index, string? value)
+    {
+        if (model is null || index < 0 || index >= model.Specs.Count) return;
+        model.Specs[index] = model.Specs[index] with { Value = value ?? string.Empty };
+    }
+
+    private async Task UploadGalleryAsync(InputFileChangeEventArgs e)
+    {
+        if (model is null || model.Id <= 0) return;
+        uploadingGallery = true;
+        try
+        {
+            var file = e.File;
+            await using var stream = file.OpenReadStream(5 * 1024 * 1024);
+            var dto = await Service.AddImageAsync(model.Id, stream, file.Name);
+            model.Images.Add(dto);
+            ToastService.ShowSuccess("تصویر به گالری اضافه شد.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError(ErrorMessageHelper.ToUserMessage(ex));
+        }
+        finally
+        {
+            uploadingGallery = false;
+        }
+    }
+
+    private async Task DeleteImageAsync(int imageId)
+    {
+        if (model is null) return;
+        try
+        {
+            await Service.DeleteImageAsync(imageId);
+            model.Images.RemoveAll(i => i.Id == imageId);
+            ToastService.ShowSuccess("تصویر حذف شد.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError(ErrorMessageHelper.ToUserMessage(ex));
+        }
     }
 
     private async Task UploadAsync(InputFileChangeEventArgs e)

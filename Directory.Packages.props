@@ -7,6 +7,9 @@
     <!-- حسابرسی آسیب‌پذیری‌ها در هر restore (هشدار NU190x). چون TreatWarningsAsErrors
          خاموش است، بیلد را قرمز نمی‌کند ولی در خروجی build/CI دیده می‌شود. -->
     <NuGetAuditMode>all</NuGetAuditMode>
+    <!-- پین‌کردن وابستگی‌های گذرا: نسخهٔ PackageVersion بر نسخهٔ درخواستیِ بستهٔ والد
+         اولویت می‌یابد. برای وصلهٔ آسیب‌پذیریِ گذرا (مثل Pkcs از مسیر MimeKit) لازم است. -->
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
 
   <ItemGroup>
@@ -49,7 +52,19 @@
     <PackageVersion Include="Moq" Version="4.20.72" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />
-    <PackageVersion Include="AngleSharp" Version="0.17.1" />
+    <!-- پالایش HTML محصول/صفحه (XSS ذخیره‌شده). نسخهٔ ۱.۵.۰ به بالا آسیب‌پذیری
+         GHSA-pgww-w46g-26qg را وصله می‌کند؛ ۰.۱۷.۱ آسیب‌پذیر بود. -->
+    <PackageVersion Include="AngleSharp" Version="1.10.3" />
+    <!-- وابستگی گذرا (MimeKit←MailKit و Microsoft.Data.SqlClient). نسخهٔ ۱۰.۰.۰ دارای
+         آسیب‌پذیری HIGH (GHSA-846f-f764-76mx) و Moderate (GHSA-2fmv-rv2c-59x7) بود؛
+         ۱۰.۰.۱۳ هر دو را وصله می‌کند و با خانوادهٔ EF/ASP.NET هم‌نسخه است. -->
+    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
+
+    <!-- تغییر اندازهٔ تصاویر محصول برای srcset (خروجی WebP). مجوز MIT و کاملاً managed؛
+         نسخهٔ NativeAssets.Linux.NoDependencies برای ایمیج تولیدی (بدون fontconfig) است. -->
+    <PackageVersion Include="SkiaSharp" Version="4.156.1" />
+    <PackageVersion Include="SkiaSharp.NativeAssets.Win32" Version="4.156.1" />
+    <PackageVersion Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.156.1" />
   </ItemGroup>
 
 </Project>

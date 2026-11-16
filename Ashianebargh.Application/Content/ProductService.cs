@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using System.IO;
 using Microsoft.Extensions.Logging;
 using Ashianebargh.Application.DTOs;
@@ -23,8 +23,33 @@ public interface IProductService
     Task DeleteFileAsync(int fileId);
     Task<ProductFileDownloadDto?> GetFileForDownloadAsync(int fileId);
 
+    /// <summary>افزودن تصویر گالری به محصول موجود.</summary>
+    Task<ProductImageDto> AddImageAsync(int productId, Stream stream, string fileName);
+
+    /// <summary>حذف تصویر گالری (ردیف و فایل فیزیکی).</summary>
+    Task DeleteImageAsync(int imageId);
+
+    /// <summary>آیا این تصویر به محصولی فعال (در دستهٔ فعال) تعلق دارد؟ برای سرو عمومی رسانه.</summary>
+    Task<bool> IsImagePublicAsync(string storageId);
+
+    /// <summary>آیا این فایل پیوستِ محصولی فعال (در دستهٔ فعال) است؟ برای سرو عمومی رسانه.</summary>
+    Task<bool> IsFilePublicAsync(string storageId);
+
     Task<PagedResult<ProductCardDto>> GetPublicPagedAsync(PublicProductFilter filter);
     Task<List<ProductCardDto>> GetFeaturedAsync(int count);
+
+    /// <summary>محصولات هم‌دسته برای بخش «محصولات مرتبط» صفحهٔ جزئیات.</summary>
+    Task<List<ProductCardDto>> GetRelatedAsync(int productId, string categorySlug, int count);
+
+    /// <summary>مسیر و تاریخ تغییر محصولات فعال برای sitemap.xml.</summary>
+    Task<List<SitemapEntryDto>> GetPublicSitemapAsync();
+
+    /// <summary>
+    /// شناسهٔ ذخیره‌سازی همهٔ تصاویر (اصلی + گالری) که هنوز عمومی‌اند؛ مبنای
+    /// خانه‌تکانی کش نسخه‌های کوچک‌شده تا تصاویر محصولات حذف/غیرفعال‌شده نمانند.
+    /// </summary>
+    Task<List<string>> GetPublicImageStorageIdsAsync();
+
     Task<ProductDetailsDto?> GetPublicBySlugAsync(string slug);
 }
 
@@ -65,18 +90,25 @@ public sealed class ProductService(
             {
                 Id = p.Id,
                 Name = p.Name,
+                NameEn = p.NameEn,
                 Slug = p.Slug,
                 Code = p.Code,
                 CategoryId = p.CategoryId,
                 ShortDescription = p.ShortDescription,
+                ShortDescriptionEn = p.ShortDescriptionEn,
                 Description = p.Description,
+                DescriptionEn = p.DescriptionEn,
                 Price = p.Price,
                 TagIds = p.Tags.Select(t => t.Id).ToList(),
                 IsActive = p.IsActive,
                 IsFeatured = p.IsFeatured,
                 SortOrder = p.SortOrder,
                 MainImageStorageId = p.MainImageStorageId,
-                Files = p.Files.Select(f => new ProductFileDto(f.Id, f.FileName, f.StorageId, f.ContentType, f.SizeBytes)).ToList()
+                Files = p.Files.Select(f => new ProductFileDto(f.Id, f.FileName, f.StorageId, f.ContentType, f.SizeBytes)).ToList(),
+                Specs = p.Specs.OrderBy(s => s.SortOrder).ThenBy(s => s.Id)
+                    .Select(s => new ProductSpecDto(s.Title, s.Value)).ToList(),
+                Images = p.Images.OrderBy(i => i.SortOrder).ThenBy(i => i.Id)
+                    .Select(i => new ProductImageDto(i.Id, i.StorageId)).ToList()
             })
             .FirstOrDefaultAsync();
 
@@ -84,33 +116,34 @@ public sealed class ProductService(
     {
         var name = (dto.Name ?? string.Empty).Trim();
         if (name.Length == 0)
-            throw new BusinessRuleException("ظ†ط§ظ… ظ…ط­طµظˆظ„ ط±ط§ ظˆط§ط±ط¯ ع©ظ†غŒط¯.");
+            throw new BusinessRuleException("نام محصول را وارد کنید.");
 
         var slug = SlugHelper.Normalize(dto.Slug);
         if (slug.Length == 0) slug = SlugHelper.Normalize(name);
         if (slug.Length == 0)
-            throw new BusinessRuleException("ظ†ط§ظ…ع© ظ…ط¹طھط¨ط± ظ†غŒط³طھط› ط­ط¯ط§ظ‚ظ„ غŒع© ط­ط±ظپ غŒط§ ط±ظ‚ظ… ظ„ط§ط²ظ… ط§ط³طھ.");
+            throw new BusinessRuleException("نامک معتبر نیست؛ حداقل یک حرف یا رقم لازم است.");
 
         if (!await uow.Content.Categories.AnyAsync(c => c.Id == dto.CategoryId))
-            throw new BusinessRuleException("ط¯ط³طھظ‡ظ” ط§ظ†طھط®ط§ط¨â€Œط´ط¯ظ‡ غŒط§ظپطھ ظ†ط´ط¯.");
+            throw new BusinessRuleException("دستهٔ انتخاب‌شده یافت نشد.");
 
         if (await uow.Content.Products.AnyAsync(p => p.Slug == slug && p.Id != dto.Id))
-            throw new BusinessRuleException("ط§غŒظ† ظ†ط§ظ…ع© ظ‚ط¨ظ„ط§ظ‹ ط¨ط±ط§غŒ ظ…ط­طµظˆظ„ ط¯غŒع¯ط±غŒ ط§ط³طھظپط§ط¯ظ‡ ط´ط¯ظ‡ ط§ط³طھ.");
+            throw new BusinessRuleException("این نامک قبلاً برای محصول دیگری استفاده شده است.");
 
         var tagIds = dto.TagIds.Distinct().ToList();
         var tags = new List<Tag>();
         if (tagIds.Count > 0)
             tags = await uow.Content.Tags.Where(t => tagIds.Contains(t.Id)).ToListAsync();
         if (tags.Count != tagIds.Count)
-            throw new BusinessRuleException("ط¨ط±ع†ط³ط¨ ط§ظ†طھط®ط§ط¨â€Œط´ط¯ظ‡ غŒط§ظپطھ ظ†ط´ط¯ط› ظپظ‡ط±ط³طھ ط±ط§ طھط§ط²ظ‡ ع©ظ†غŒط¯.");
+            throw new BusinessRuleException("برچسب انتخاب‌شده یافت نشد؛ فهرست را تازه کنید.");
 
         Product entity;
         if (dto.Id > 0)
         {
             entity = await uow.Content.Products
                 .Include(p => p.Tags)
+                .Include(p => p.Specs)
                 .FirstOrDefaultAsync(p => p.Id == dto.Id)
-                ?? throw new NotFoundException("ظ…ط­طµظˆظ„", dto.Id);
+                ?? throw new NotFoundException("محصول", dto.Id);
         }
         else
         {
@@ -119,11 +152,14 @@ public sealed class ProductService(
         }
 
         entity.Name = name;
+        entity.NameEn = string.IsNullOrWhiteSpace(dto.NameEn) ? string.Empty : dto.NameEn.Trim();
         entity.Slug = slug;
         entity.Code = string.IsNullOrWhiteSpace(dto.Code) ? null : dto.Code.Trim();
         entity.CategoryId = dto.CategoryId;
         entity.ShortDescription = string.IsNullOrWhiteSpace(dto.ShortDescription) ? null : dto.ShortDescription.Trim();
+        entity.ShortDescriptionEn = string.IsNullOrWhiteSpace(dto.ShortDescriptionEn) ? null : dto.ShortDescriptionEn.Trim();
         entity.Description = dto.Description;
+        entity.DescriptionEn = dto.DescriptionEn;
         entity.Price = dto.Price;
         entity.IsActive = dto.IsActive;
         entity.IsFeatured = dto.IsFeatured;
@@ -133,14 +169,40 @@ public sealed class ProductService(
         foreach (var tag in tags)
             entity.Tags.Add(tag);
 
+        SyncSpecs(entity, dto.Specs);
+
         await uow.CompleteAsync();
         return entity.Id;
+    }
+
+    /// <summary>
+    /// مشخصات فنی را با فهرست ارسالی هم‌تراز می‌کند: ردیف‌های خالی نادیده گرفته
+    /// می‌شوند، ترتیب ورودی حفظ می‌شود و ردیف‌های حذف‌شده پاک می‌شوند.
+    /// </summary>
+    private static void SyncSpecs(Product product, List<ProductSpecDto>? specs)
+    {
+        var incoming = (specs ?? new List<ProductSpecDto>())
+            .Where(s => !string.IsNullOrWhiteSpace(s.Title) && !string.IsNullOrWhiteSpace(s.Value))
+            .Select(s => (Title: s.Title.Trim(), Value: s.Value.Trim()))
+            .ToList();
+
+        product.Specs.Clear();
+
+        for (var i = 0; i < incoming.Count; i++)
+        {
+            product.Specs.Add(new ProductSpec
+            {
+                Title = incoming[i].Title,
+                Value = incoming[i].Value,
+                SortOrder = i
+            });
+        }
     }
 
     public async Task SetImageAsync(int productId, string? storageId)
     {
         var entity = await uow.Content.Products.FirstOrDefaultAsync(p => p.Id == productId)
-            ?? throw new NotFoundException("ظ…ط­طµظˆظ„", productId);
+            ?? throw new NotFoundException("محصول", productId);
 
         var oldStorageId = entity.MainImageStorageId;
         entity.MainImageStorageId = string.IsNullOrWhiteSpace(storageId) ? null : storageId;
@@ -153,7 +215,7 @@ public sealed class ProductService(
     public async Task DeleteAsync(int id)
     {
         var entity = await uow.Content.Products.FirstOrDefaultAsync(p => p.Id == id)
-            ?? throw new NotFoundException("ظ…ط­طµظˆظ„", id);
+            ?? throw new NotFoundException("محصول", id);
 
         var storageId = entity.MainImageStorageId;
 
@@ -163,11 +225,19 @@ public sealed class ProductService(
         foreach (var file in files)
             uow.Content.Remove(file);
 
+        // گالری هم مثل پیوست‌ها: ردیف حذف و فایل فیزیکی پاک شود.
+        var images = await uow.Content.ProductImages.Where(i => i.ProductId == id).ToListAsync();
+        foreach (var image in images)
+            uow.Content.Remove(image);
+
         uow.Content.Remove(entity);
         await uow.CompleteAsync();
 
         foreach (var file in files)
             await TryDeleteFileAsync(file.StorageId, ContentStorage.ProductFileType);
+
+        foreach (var image in images)
+            await TryDeleteFileAsync(image.StorageId);
 
         if (!string.IsNullOrEmpty(storageId))
             await TryDeleteFileAsync(storageId);
@@ -231,6 +301,12 @@ public sealed class ProductService(
         var product = await uow.Content.Products.FirstOrDefaultAsync(p => p.Id == productId)
             ?? throw new NotFoundException("محصول", productId);
 
+        // فایل باید واقعاً در فضای ذخیره‌سازی وجود داشته باشد؛ وگرنه storageId جعلی یا
+        // متعلق به فضای دیگر به محصول وصل می‌شود و از مسیر عمومی رسانه قابل دانلود می‌گردد.
+        if (string.IsNullOrWhiteSpace(storageId) ||
+            !await storage.ExistsAsync(ContentStorage.Owner, ContentStorage.ProductFileType, storageId))
+            throw new BusinessRuleException("فایل آپلودشده در فضای ذخیره‌سازی یافت نشد.");
+
         var file = new ProductFile
         {
             ProductId = product.Id,
@@ -261,6 +337,19 @@ public sealed class ProductService(
             .Select(f => new ProductFileDownloadDto(f.Id, f.FileName, f.StorageId, f.ContentType, f.SizeBytes))
             .FirstOrDefaultAsync();
 
+    // سرو عمومی رسانه باید فقط فایلِ محصولات فعال را نشان دهد؛ وگرنه با غیرفعال‌کردن
+    // محصول، تصویر/فایلش همچنان از مسیر storageId قابل دانلود می‌ماند (نشت محتوای پنهان).
+    // تصاویر گالری هم مثل تصویر اصلی باید همین گارد را داشته باشند.
+    public async Task<bool> IsImagePublicAsync(string storageId) =>
+        await uow.Content.Products.AsNoTracking()
+            .AnyAsync(p => p.MainImageStorageId == storageId && p.IsActive && p.Category!.IsActive)
+        || await uow.Content.ProductImages.AsNoTracking()
+            .AnyAsync(i => i.StorageId == storageId && i.Product!.IsActive && i.Product.Category!.IsActive);
+
+    public Task<bool> IsFilePublicAsync(string storageId) =>
+        uow.Content.ProductFiles.AsNoTracking()
+            .AnyAsync(f => f.StorageId == storageId && f.Product!.IsActive && f.Product.Category!.IsActive);
+
     public async Task<PagedResult<ProductCardDto>> GetPublicPagedAsync(PublicProductFilter filter)
     {
         var query = uow.Content.Products.AsNoTracking()
@@ -279,13 +368,60 @@ public sealed class ProductService(
                 p => p.Name, p => p.NameEn, p => p.Code, p => p.ShortDescription, p => p.ShortDescriptionEn));
         }
 
-        var projected = query
-            .OrderBy(p => p.SortOrder).ThenBy(p => p.Name)
+        var projected = OrderPublic(query, filter.Sort)
             .Select(p => new ProductCardDto(
                 p.Id, p.Name, p.NameEn, p.Slug, p.Code, p.ShortDescription, p.ShortDescriptionEn, p.Price,
                 p.MainImageStorageId, p.Category!.Name, p.Category.Slug));
 
         return await projected.ToPagedAsync(filter.Page, filter.PageSize);
+    }
+
+    /// <summary>
+    /// ترتیب فهرست عمومی. «price-asc/desc» ابتدا محصولات بدون قیمت را جدا می‌کند
+    /// (قیمت نامعلوم نباید ارزان‌ترین به نظر برسد) و در نهایت نام برای ترتیب پایدار.
+    /// </summary>
+    private static IQueryable<Product> OrderPublic(IQueryable<Product> query, string? sort) =>
+        sort switch
+        {
+            "newest" => query.OrderByDescending(p => p.CreatedAt).ThenBy(p => p.Id),
+            "price-asc" => query.OrderBy(p => p.Price == null).ThenBy(p => p.Price).ThenBy(p => p.Name),
+            "price-desc" => query.OrderBy(p => p.Price == null).ThenByDescending(p => p.Price).ThenBy(p => p.Name),
+            "name" => query.OrderBy(p => p.Name),
+            _ => query.OrderBy(p => p.SortOrder).ThenBy(p => p.Name)
+        };
+
+    public Task<List<ProductCardDto>> GetRelatedAsync(int productId, string categorySlug, int count) =>
+        uow.Content.Products.AsNoTracking()
+            .Where(p => p.IsActive && p.Category!.IsActive && p.Id != productId && p.Category!.Slug == categorySlug)
+            .OrderBy(p => p.SortOrder).ThenBy(p => p.Name)
+            .Take(Math.Clamp(count, 1, 12))
+            .Select(p => new ProductCardDto(
+                p.Id, p.Name, p.NameEn, p.Slug, p.Code, p.ShortDescription, p.ShortDescriptionEn, p.Price,
+                p.MainImageStorageId, p.Category!.Name, p.Category.Slug))
+            .ToListAsync();
+
+    public Task<List<SitemapEntryDto>> GetPublicSitemapAsync() =>
+        uow.Content.Products.AsNoTracking()
+            .Where(p => p.IsActive && p.Category!.IsActive && p.Slug != string.Empty)
+            .OrderBy(p => p.Id)
+            .Select(p => new SitemapEntryDto("/product/" + p.Slug, p.UpdatedAt ?? p.CreatedAt))
+            .ToListAsync();
+
+    public async Task<List<string>> GetPublicImageStorageIdsAsync()
+    {
+        var mainImages = await uow.Content.Products.AsNoTracking()
+            .Where(p => p.IsActive && p.Category!.IsActive && p.MainImageStorageId != null)
+            .Select(p => p.MainImageStorageId!)
+            .ToListAsync();
+
+        var galleryImages = await uow.Content.ProductImages.AsNoTracking()
+            .Where(i => i.Product!.IsActive && i.Product.Category!.IsActive)
+            .Select(i => i.StorageId)
+            .ToListAsync();
+
+        return mainImages.Concat(galleryImages)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
     }
 
     public Task<List<ProductCardDto>> GetFeaturedAsync(int count) =>
@@ -302,12 +438,52 @@ public sealed class ProductService(
         uow.Content.Products.AsNoTracking()
             .Where(p => p.Slug == slug && p.IsActive && p.Category!.IsActive)
             .Select(p => new ProductDetailsDto(
-                p.Id, p.Name, p.Slug, p.Code, p.Category!.Name, p.Category.Slug,
-                p.ShortDescription, p.Description, p.Price, p.MainImageStorageId,
+                p.Id, p.Name, p.NameEn, p.Slug, p.Code, p.Category!.Name, p.Category.Slug,
+                p.ShortDescription, p.ShortDescriptionEn, p.Description, p.DescriptionEn,
+                p.Price, p.MainImageStorageId,
                 p.Tags.OrderBy(t => t.Name)
                     .Select(t => new TagDto(t.Id, t.Name, t.Slug)).ToList(),
-                p.Files.Select(f => new ProductFileDto(f.Id, f.FileName, f.StorageId, f.ContentType, f.SizeBytes)).ToList()))
+                p.Files.Select(f => new ProductFileDto(f.Id, f.FileName, f.StorageId, f.ContentType, f.SizeBytes)).ToList(),
+                p.Specs.OrderBy(s => s.SortOrder).ThenBy(s => s.Id)
+                    .Select(s => new ProductSpecDto(s.Title, s.Value)).ToList(),
+                p.Images.OrderBy(i => i.SortOrder).ThenBy(i => i.Id)
+                    .Select(i => new ProductImageDto(i.Id, i.StorageId)).ToList()))
             .FirstOrDefaultAsync();
+
+    public async Task<ProductImageDto> AddImageAsync(int productId, Stream stream, string fileName)
+    {
+        var product = await uow.Content.Products.FirstOrDefaultAsync(p => p.Id == productId)
+            ?? throw new NotFoundException("محصول", productId);
+
+        var storageId = await storage.SaveAsync(
+            ContentStorage.Owner, ContentStorage.ProductImageType, stream, fileName, "image/*");
+
+        var nextOrder = await uow.Content.ProductImages
+            .Where(i => i.ProductId == productId)
+            .Select(i => (int?)i.SortOrder).MaxAsync() ?? -1;
+
+        var image = new ProductImage
+        {
+            ProductId = product.Id,
+            StorageId = storageId,
+            SortOrder = nextOrder + 1
+        };
+        uow.Content.Add(image);
+        await uow.CompleteAsync();
+
+        return new ProductImageDto(image.Id, image.StorageId);
+    }
+
+    public async Task DeleteImageAsync(int imageId)
+    {
+        var image = await uow.Content.ProductImages.FirstOrDefaultAsync(i => i.Id == imageId)
+            ?? throw new NotFoundException("تصویر", imageId);
+
+        uow.Content.Remove(image);
+        await uow.CompleteAsync();
+
+        await TryDeleteFileAsync(image.StorageId);
+    }
 
     private async Task TryDeleteFileAsync(string storageId, string fileType = ContentStorage.ProductImageType)
     {
@@ -317,8 +493,8 @@ public sealed class ProductService(
         }
         catch (Exception ex)
         {
-            // ظ¾ط§ع©â€Œظ†ط´ط¯ظ† ظپط§غŒظ„ ظ†ط¨ط§غŒط¯ ط­ط°ظپ/ظˆغŒط±ط§غŒط´ ظ…ط­طµظˆظ„ ط±ط§ ط´ع©ط³طھ ط¯ظ‡ط¯ط› ظپظ‚ط· ط¨ط±ط§غŒ ط¨ط±ط±ط³غŒ ظ„ط§ع¯ ظ…غŒâ€Œط´ظˆط¯.
-            logger.LogWarning(ex, "ط­ط°ظپ ظپط§غŒظ„ طھطµظˆغŒط± ظ…ط­طµظˆظ„ ظ†ط§ظ…ظˆظپظ‚ ط¨ظˆط¯: {StorageId}", storageId);
+            // پاک‌نشدن فایل نباید حذف/ویرایش محصول را شکست دهد؛ فقط برای بررسی لاگ می‌شود.
+            logger.LogWarning(ex, "حذف فایل تصویر محصول ناموفق بود: {StorageId}", storageId);
         }
     }
 }

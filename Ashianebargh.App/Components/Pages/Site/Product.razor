@@ -1,26 +1,25 @@
 @page "/product/{Slug}"
+@attribute [AllowAnonymous]
 @layout SiteLayout
+@using Microsoft.AspNetCore.Http
 @using Ashianebargh.Application.Content
 @using Ashianebargh.Application.Helpers
 @using Ashianebargh.App.Services
 @inject IProductService ProductService
 @inject ICategoryService CategoryService
 @inject SiteLanguage Language
+@inject NavigationManager Nav
 
 @if (product is null)
 {
     <PageTitle>@Language["detail.notFoundTitle"]</PageTitle>
-    <div class="site-container">
-        <div class="site-empty">
-            <i class="bi bi-box-seam"></i>
-            <p>@Language["detail.notFound"]</p>
-            <a href="/products" class="btn btn-sm btn-outline-secondary">@Language["detail.backToProducts"]</a>
-        </div>
-    </div>
+    <NotFoundContent From="@("/product/" + Slug)" />
 }
 else
 {
-    <PageTitle>@product.Name | آشیانه برق</PageTitle>
+    <PageTitle>@DisplayName | آشیانه برق</PageTitle>
+    <SeoMeta Title="@DisplayName" Description="@SeoDescription" Path="@("/product/" + product.Slug)"
+             Type="product" ImageUrl="@AbsoluteImageUrl" JsonLd="@JsonLdBlocks" />
 
     <div class="site-container">
         <nav class="site-breadcrumb" aria-label="@Language["aria.breadcrumb"]">
@@ -28,9 +27,9 @@ else
             <span class="sep">/</span>
             <a href="/products">@Language["nav.products"]</a>
             <span class="sep">/</span>
-            <a href="/products?category=@product.CategorySlug">@product.CategoryName</a>
+            <a href="/category/@product.CategorySlug">@product.CategoryName</a>
             <span class="sep">/</span>
-            <span class="current">@product.Name</span>
+            <span class="current">@DisplayName</span>
         </nav>
 
         <div class="site-detail-layout">
@@ -44,7 +43,7 @@ else
                     @foreach (var category in categories)
                     {
                         <a class="@(category.Slug == product.CategorySlug ? "on" : "")"
-                           href="/products?category=@category.Slug">
+                           href="/category/@category.Slug">
                             <span class="site-side-icon"><i class="bi bi-diagram-3"></i></span>
                             <span class="site-side-name">@category.Name</span>
                             <span class="site-side-count">@category.ProductCount</span>
@@ -57,16 +56,16 @@ else
                 <div class="site-detail-top">
                     <div class="site-detail-info">
                         <span class="site-detail-cat"><i class="bi bi-diagram-3"></i>@product.CategoryName</span>
-                        <h1 class="site-detail-title">@product.Name</h1>
+                        <h1 class="site-detail-title">@DisplayName</h1>
 
                         @if (!string.IsNullOrWhiteSpace(product.Code))
                         {
                             <div class="site-detail-code">@Language["detail.codePrefix"] <b dir="ltr">@product.Code</b></div>
                         }
 
-                        @if (!string.IsNullOrWhiteSpace(product.ShortDescription))
+                        @if (!string.IsNullOrWhiteSpace(DisplayShortDescription))
                         {
-                            <p>@product.ShortDescription</p>
+                            <p>@DisplayShortDescription</p>
                         }
 
                         <div class="site-detail-price">
@@ -85,15 +84,24 @@ else
                         }
 
                         <div class="site-actions-row">
-                            <a href="/contact" class="site-btn site-btn--red"><i class="bi bi-send"></i>@Language["detail.quote"]</a>
-                            <a href="/products" class="site-btn site-btn--navy"><i class="bi bi-grid"></i>@Language["detail.other"]</a>
+                            <a href="@QuoteUrl" class="site-btn site-btn--red">
+                                <i class="bi bi-send"></i>@Language["detail.quote"]
+                            </a>
+                            <a href="/category/@product.CategorySlug" class="site-btn site-btn--navy">
+                                <i class="bi bi-grid"></i>@Language["detail.other"]
+                            </a>
                         </div>
                     </div>
 
                     <div class="site-detail-media">
-                        @if (!string.IsNullOrEmpty(product.MainImageStorageId))
+                        @if (selectedImage is not null)
                         {
-                            <img src="/media/products/@product.MainImageStorageId" alt="@product.Name" />
+                            <img src="/media/products/@(selectedImage)?w=800"
+                                 srcset="/media/products/@(selectedImage)?w=480 480w,
+                                         /media/products/@(selectedImage)?w=800 800w,
+                                         /media/products/@(selectedImage)?w=1200 1200w"
+                                 sizes="(max-width: 900px) 92vw, 520px"
+                                 alt="@DisplayName" width="800" height="600" />
                         }
                         else
                         {
@@ -101,6 +109,24 @@ else
                         }
                     </div>
                 </div>
+
+                @if (galleryImages.Count > 1)
+                {
+                    <div class="site-gallery" role="group" aria-label="@Language["detail.gallery"]">
+                        @for (var i = 0; i < galleryImages.Count; i++)
+                        {
+                            var index = i + 1;
+                            var isCurrent = index == SelectedImageIndex;
+                            <a class="site-gallery-thumb @(isCurrent ? "on" : "")"
+                               href="@("/product/" + product.Slug + (index > 1 ? "?img=" + index : string.Empty))"
+                               aria-current="@(isCurrent ? "true" : null)"
+                               aria-label="@Language["detail.galleryAlt"].Replace("{0}", index.ToString()).Replace("{1}", galleryImages.Count.ToString()).Replace("{2}", DisplayName)">
+                                <img src="/media/products/@(galleryImages[i])?w=160" alt="" width="96" height="72"
+                                     loading="lazy" decoding="async" />
+                            </a>
+                        }
+                    </div>
+                }
 
                 <h2 class="site-subhead">@Language["detail.summary"]</h2>
                 <div class="site-table-wrap">
@@ -128,31 +154,36 @@ else
                                 <td>@Language["detail.tags"]</td>
                                 <td>@(product.Tags.Count == 0 ? "—" : string.Join(Language.IsEnglish ? ", " : "، ", product.Tags.Select(t => t.Name)))</td>
                             </tr>
+                            @foreach (var spec in product.Specs)
+                            {
+                                <tr>
+                                    <td>@spec.Title</td>
+                                    <td>@spec.Value</td>
+                                </tr>
+                            }
                         </tbody>
                     </table>
                 </div>
 
-                @if (!string.IsNullOrWhiteSpace(product.Description))
+                @if (specsInDescription)
                 {
                     <h2 class="site-subhead">@Language["detail.specs"]</h2>
-                    @if (product.Description.TrimStart().StartsWith("<table", StringComparison.OrdinalIgnoreCase))
-                    {
-                        <div class="site-table-wrap">
-                            <div class="site-specs-wrap">
-                                @((MarkupString)product.Description)
-                            </div>
-                            <p class="site-specs-hint">
-                                <i class="bi bi-arrow-left-right"></i>
-                                @(Language.IsEnglish ? "Swipe the table horizontally to see all columns." : "برای دیدن همهٔ ستون‌ها، جدول را افقی بکشید.")
-                            </p>
+                    <div class="site-table-wrap">
+                        <div class="site-specs-wrap">
+                            @((MarkupString)safeDescription)
                         </div>
-                    }
-                    else
-                    {
-                        <div class="site-detail-desc">
-                            <ContentParagraphs Text="@product.Description" />
-                        </div>
-                    }
+                        <p class="site-specs-hint">
+                            <i class="bi bi-arrow-left-right"></i>
+                            @(Language.IsEnglish ? "Swipe the table horizontally to see all columns." : "برای دیدن همهٔ ستون‌ها، جدول را افقی بکشید.")
+                        </p>
+                    </div>
+                }
+                else if (!string.IsNullOrWhiteSpace(DisplayDescription))
+                {
+                    <h2 class="site-subhead">@Language["detail.description"]</h2>
+                    <div class="site-detail-desc">
+                        <ContentParagraphs Text="@DisplayDescription" />
+                    </div>
                 }
 
                 @if (product.Files.Count > 0)
@@ -176,18 +207,152 @@ else
                 }
             </section>
         </div>
+
+        @if (related.Count > 0)
+        {
+            <section class="site-section">
+                <div class="site-section-head">
+                    <div class="site-section-title"><h2>@Language["detail.related"]</h2></div>
+                    <a class="site-more" href="/category/@product.CategorySlug">@Language["common.allProducts"] <i class="bi @Language.ForwardIcon"></i></a>
+                </div>
+                <div class="site-grid site-grid--4">
+                    @foreach (var item in related)
+                    {
+                        <ProductCardView Product="item" />
+                    }
+                </div>
+            </section>
+        }
     </div>
 }
 
 @code {
     [Parameter] public string Slug { get; set; } = string.Empty;
+    [SupplyParameterFromQuery(Name = "img")] public int? ImageIndex { get; set; }
 
     private ProductDetailsDto? product;
     private List<CategoryListItemDto> categories = new();
+    private List<ProductCardDto> related = new();
+    private string safeDescription = string.Empty;
+    private bool specsInDescription;
+
+    /// <summary>تصویر اصلی + گالری، به ترتیبی که کاربر می‌بیند.</summary>
+    private readonly List<string> galleryImages = new();
+
+    private string DisplayName =>
+        Language.IsEnglish && !string.IsNullOrWhiteSpace(product!.NameEn) ? product.NameEn : product!.Name;
+
+    private string? DisplayShortDescription =>
+        Language.IsEnglish && !string.IsNullOrWhiteSpace(product!.ShortDescriptionEn)
+            ? product.ShortDescriptionEn
+            : product!.ShortDescription;
+
+    private string? DisplayDescription =>
+        Language.IsEnglish && !string.IsNullOrWhiteSpace(product!.DescriptionEn)
+            ? HtmlContentSanitizer.Sanitize(product.DescriptionEn)
+            : safeDescription;
+
+    private int SelectedImageIndex
+    {
+        get
+        {
+            if (galleryImages.Count == 0) return 0;
+            var index = ImageIndex ?? 1;
+            return Math.Clamp(index, 1, galleryImages.Count);
+        }
+    }
+
+    private string? selectedImage =>
+        galleryImages.Count == 0 ? null : galleryImages[SelectedImageIndex - 1];
+
+    private string QuoteUrl => $"/contact?product={Uri.EscapeDataString(product!.Slug)}";
+
+    private string SeoDescription
+    {
+        get
+        {
+            var text = (DisplayShortDescription ?? StripHtml(DisplayDescription ?? string.Empty)).Trim();
+            if (text.Length == 0) text = product!.CategoryName;
+            return text.Length <= 160 ? text : text[..157].TrimEnd() + "…";
+        }
+    }
+
+    private string? AbsoluteImageUrl =>
+        selectedImage is null ? null : Nav.ToAbsoluteUri("/media/products/" + selectedImage).ToString();
+
+    private IReadOnlyList<string> JsonLdBlocks
+    {
+        get
+        {
+            var productUrl = Nav.ToAbsoluteUri($"/product/{product!.Slug}").ToString();
+            var blocks = new List<string>
+            {
+                SeoJsonLd.Product(
+                    DisplayName,
+                    string.IsNullOrWhiteSpace(SeoDescription) ? null : SeoDescription,
+                    productUrl,
+                    AbsoluteImageUrl,
+                    product.Code,
+                    product.Price,
+                    product.CategoryName,
+                    "آشیانه برق",
+                    product.Specs)
+            };
+
+            blocks.Add(SeoJsonLd.Breadcrumb(
+            [
+                (Language["common.home"], Nav.ToAbsoluteUri("/").ToString()),
+                (Language["nav.products"], Nav.ToAbsoluteUri("/products").ToString()),
+                (product.CategoryName, Nav.ToAbsoluteUri($"/category/{product.CategorySlug}").ToString()),
+                (DisplayName, productUrl)
+            ]));
+
+            return blocks;
+        }
+    }
 
     protected override async Task OnParametersSetAsync()
     {
         product = await ProductService.GetPublicBySlugAsync(Slug);
+
+        if (product is null)
+        {
+            categories = await CategoryService.GetActiveAsync();
+            galleryImages.Clear();
+            related.Clear();
+            return;
+        }
+
         categories = await CategoryService.GetActiveAsync();
+
+        // توضیحات پیش از رندر پالایش می‌شود (ضد XSS ذخیره‌شده). تفکیک جدول/متن
+        // بر پایهٔ خروجیِ پالایش‌شده است نه پیشوندِ رشتهٔ خام؛ این فقط چیدمان است،
+        // مرز امنیتی نیست چون پالایش مستقل انجام شده.
+        safeDescription = HtmlContentSanitizer.Sanitize(product.Description);
+        specsInDescription = safeDescription.Contains("<table", StringComparison.OrdinalIgnoreCase);
+
+        galleryImages.Clear();
+        if (!string.IsNullOrWhiteSpace(product.MainImageStorageId))
+        {
+            galleryImages.Add(product.MainImageStorageId);
+        }
+        foreach (var image in product.Images)
+        {
+            if (!galleryImages.Contains(image.StorageId))
+            {
+                galleryImages.Add(image.StorageId);
+            }
+        }
+
+        related = await ProductService.GetRelatedAsync(product.Id, product.CategorySlug, 4);
+    }
+
+    private static string StripHtml(string html)
+    {
+        if (string.IsNullOrEmpty(html)) return string.Empty;
+
+        var text = System.Text.RegularExpressions.Regex.Replace(html, "<[^>]+>", " ");
+        text = System.Net.WebUtility.HtmlDecode(text);
+        return System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ").Trim();
     }
 }

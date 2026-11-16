@@ -1,0 +1,29 @@
+@page "/404"
+@attribute [AllowAnonymous]
+@layout SiteLayout
+@using Microsoft.AspNetCore.Http
+@using Ashianebargh.App.Services
+@inject SiteLanguage Language
+@inject NavigationManager Nav
+
+<PageTitle>@Language["notFound.title"] | آشیانه برق</PageTitle>
+
+<NotFoundContent From="@attemptedPath" />
+
+@code {
+    /// <summary>
+    /// مسیر /404 ممکن است مستقیم باز شود؛ کد وضعیت ۴۰۴ را NotFoundContent ست می‌کند
+    /// (NotFoundStatus) تا هم Soft-404 نداشته باشیم و هم بدنهٔ رندرشده دور ریخته نشود.
+    /// </summary>
+    private string? attemptedPath;
+
+    protected override void OnInitialized()
+    {
+        var uri = new Uri(Nav.Uri);
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+        if (query.TryGetValue("from", out var from) && !string.IsNullOrWhiteSpace(from))
+        {
+            attemptedPath = from.ToString();
+        }
+    }
+}

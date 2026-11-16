@@ -7,6 +7,7 @@
 @using System.Security.Claims
 @inject IAuthService AuthService
 @inject AuthenticationStateProvider AuthStateProvider
+@inject ILogger<Ashianebargh.App.Components.Pages.Profile> Logger
 
 <PageTitle>پروفایل کاربری</PageTitle>
 
@@ -71,7 +72,7 @@ else
                 <div class="row">
                     <div class="col-md-6 mb-3">
                         <AppTextField Value="@password" ValueChanged="@((string? v) => password = v)"
-                                      Label="رمز عبور" InputType="password" Placeholder="حداقل ۳ کاراکتر" WrapperClass="" />
+                                      Label="رمز عبور" InputType="password" Placeholder="حداقل ۶ کاراکتر، شامل رقم و حرف لاتین کوچک" WrapperClass="" />
                     </div>
                     <div class="col-md-6 mb-3">
                         <AppTextField Value="@confirmPassword" ValueChanged="@((string? v) => confirmPassword = v)"
@@ -170,13 +171,17 @@ else
                     ProfileUpdateStatus.UserNotFound => "کاربر یافت نشد؛ لطفاً دوباره وارد شوید.",
                     ProfileUpdateStatus.FullNameTooLong => "نام کامل نمی‌تواند بیشتر از ۱۰۰ کاراکتر باشد.",
                     ProfileUpdateStatus.ImpersonationBlocked => "در حالت جانشینی امکان تعیین رمز وجود ندارد.",
+                    ProfileUpdateStatus.TooManyPasswordAttempts => "تلاش برای تعیین رمز بیش از حد مجاز بود؛ لطفاً ۱۰ دقیقه دیگر تلاش کنید.",
                     _ => "خطای ناشناخته‌ای رخ داد."
                 };
             }
         }
         catch (Exception ex)
         {
-            errorMessage = $"خطا در ذخیرهٔ تغییرات: {ex.Message}";
+            // پیام خام استثنا به کاربر نشان داده نمی‌شود: می‌تواند نام جدول/ستون،
+            // رشتهٔ اتصال یا جزئیات داخلی را لو بدهد. ترجمهٔ مرکزی فقط پیام امن می‌دهد.
+            Logger.LogError(ex, "خطا در ذخیرهٔ پروفایل کاربر {UserId}", _userId);
+            errorMessage = Ashianebargh.App.Components.Shared.ErrorMessageHelper.ToUserMessage(ex);
         }
         finally
         {

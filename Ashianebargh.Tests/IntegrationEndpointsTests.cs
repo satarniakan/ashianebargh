@@ -61,7 +61,8 @@ public class IntegrationEndpointsTests : IAsyncLifetime
         _app.UseAntiforgery();
         _app.UseRateLimiter();
         _app.MapAshianebargh();
-        _app.MapGet("/ping", () => Results.Text("pong"));
+        //.ping عمداً عمومی است؛ با سیاست fallback سراسری باید صراحتاً AllowAnonymous شود.
+        _app.MapGet("/ping", () => Results.Text("pong")).AllowAnonymous();
 
         await _app.StartAsync();
         _client = _app.GetTestClient();

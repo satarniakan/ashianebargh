@@ -27,17 +27,24 @@ public class LoginHistoryService : ILoginHistoryService
     public async Task RecordAsync(string? userId, string? userName, bool succeeded, string method,
         string? ipAddress, string? userAgent, string? failureReason = null)
     {
+        // همهٔ این ستون‌ها سقف طول دارند و مقدارشان از ورودیِ کنترل‌نشدهٔ مهاجم می‌آید
+        // (نام کاربریِ فرم/API و هدر User-Agent). بدون برش، یک درخواستِ بلند به‌جای
+        // «ورود ناموفق» خطای ذخیره‌سازی و پاسخ ۵۰۰ می‌داد — یعنی ثبت تاریخچهٔ ورود
+        // خودش به یک بردار DoS تبدیل می‌شد.
         await _repository.AddAsync(new LoginHistory
         {
-            UserId = userId,
-            UserName = userName,
+            UserId = Truncate(userId, 450),
+            UserName = Truncate(userName, 256),
             Succeeded = succeeded,
-            Method = method,
-            IpAddress = ipAddress,
-            UserAgent = userAgent is { Length: > 512 } ? userAgent[..512] : userAgent,
-            FailureReason = failureReason,
+            Method = Truncate(method, 32) ?? string.Empty,
+            IpAddress = Truncate(ipAddress, 64),
+            UserAgent = Truncate(userAgent, 512),
+            FailureReason = Truncate(failureReason, 256),
             OccurredAtUtc = _clock.GetUtcNow().UtcDateTime
         });
         await _unitOfWork.CompleteAsync();
     }
+
+    private static string? Truncate(string? value, int maxLength) =>
+        value is { Length: > 0 } && value.Length > maxLength ? value[..maxLength] : value;
 }

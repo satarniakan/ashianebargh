@@ -105,4 +105,64 @@ public class FileStorageTests : IDisposable
         Assert.False(await storage.ExistsAsync("owner-1", "doc", id));
         Assert.Null(await storage.OpenReadAsync("owner-1", "doc", id));
     }
+
+    private static MemoryStream StreamOfBytes(byte[] bytes) => new(bytes);
+
+    // امضای واقعی PNG (۸ بایت اول) + چند بایت ادامه؛ برای بررسی magic-byte کافی است.
+    private static byte[] PngHeader() => new byte[]
+    {
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+        0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52
+    };
+
+    [Fact]
+    public async Task Save_ValidPngSignature_IsAccepted()
+    {
+        var storage = Build();
+
+        var id = await storage.SaveAsync("owner-1", "img", StreamOfBytes(PngHeader()), "photo.png");
+
+        Assert.True(await storage.ExistsAsync("owner-1", "img", id));
+    }
+
+    [Fact]
+    public async Task Save_SpoofedPng_TextContent_Throws()
+    {
+        // پسوند png ولی محتوا متن است → امضا نمی‌خواند → رد (ضد جعل پسوند).
+        var storage = Build();
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            storage.SaveAsync("owner-1", "img", StreamOf("سلام"), "fake.png"));
+    }
+
+    [Fact]
+    public async Task Save_HtmlDisguisedAsJpg_Throws()
+    {
+        var storage = Build(new Dictionary<string, string?>
+        {
+            ["Storage:AllowedExtensions"] = "jpg"
+        });
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            storage.SaveAsync("owner-1", "img", StreamOf("<html><script>alert(1)</script></html>"), "evil.jpg"));
+    }
+
+    [Fact]
+    public async Task Save_DangerousContentType_Throws()
+    {
+        // حتی با بایت‌های معتبر PNG، contentType وب/اجرایی رد می‌شود.
+        var storage = Build();
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            storage.SaveAsync("owner-1", "img", StreamOfBytes(PngHeader()), "photo.png", "text/html"));
+    }
+
+    [Fact]
+    public async Task Save_EmptyFile_Throws()
+    {
+        var storage = Build();
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            storage.SaveAsync("owner-1", "doc", StreamOfBytes(Array.Empty<byte>()), "empty.txt"));
+    }
 }

@@ -65,7 +65,10 @@ public static class FileEndpoints
 
             // اتمیک: اگر هیچ بایتی نخوانده، stream هم باید dispose شود
             return Results.Stream(stream, contentType);
-        });
+            // مجوزدهی در خودِ handler انجام می‌شود (نبودِ کاربر → ۴۰۱، سیاست → ۴۰۳)
+            // تا به‌جای ریدایرکتِ کوکی به صفحهٔ ورود، کد وضعیت درستِ API برگردد.
+            // پس از سیاست fallbackِ سراسری صراحتاً خارج می‌شویم؛ وگرنه ناشناس ۳۰۲ می‌گرفت.
+        }).AllowAnonymous();
 
         return app;
 

@@ -1,0 +1,28 @@
+@* نوار مرتب‌سازی مشترک فهرست محصولات و صفحهٔ دسته. *@
+@using Ashianebargh.App.Services
+@inject SiteLanguage Language
+
+<nav class="site-sort" aria-label="@Language["sort.label"]">
+    <span class="site-sort-label">@Language["sort.label"]</span>
+    @foreach (var option in Options)
+    {
+        <a class="site-sort-link @(SortKey == option.Key ? "on" : "")"
+           href="@UrlFor(option.Key)">@Language[option.LabelKey]</a>
+    }
+</nav>
+
+@code {
+    /// <summary>کلید مرتب‌سازی جاری (خالی = پیشنهاد ما).</summary>
+    [Parameter] public string SortKey { get; set; } = string.Empty;
+
+    /// <summary>سازندهٔ لینک برای هر کلید مرتب‌سازی.</summary>
+    [Parameter, EditorRequired] public Func<string, string> UrlFor { get; set; } = default!;
+
+    private static readonly (string Key, string LabelKey)[] Options =
+    [
+        ("", "sort.default"),
+        ("newest", "sort.newest"),
+        ("price-asc", "sort.priceAsc"),
+        ("price-desc", "sort.priceDesc")
+    ];
+}

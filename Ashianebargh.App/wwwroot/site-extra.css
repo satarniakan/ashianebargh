@@ -1,0 +1,583 @@
+/* ==========================================================================
+   لایهٔ بازبینی UI/UX سایت — بعد از site.css بارگذاری می‌شود تا مقادیر قبلی را
+   بازنویسی کند: مقیاس خوانایی، منوی موبایل، اجزای تازه (مرتب‌سازی، فیلتر،
+   صفحه‌بندی عددی، گالری، ۴۰۴، باند CTA) و دسترس‌پذیری.
+   ========================================================================== */
+
+/* ---------- مقیاس خوانایی ---------- */
+
+.site-shell {
+    font-size: 15px;
+}
+
+.site-shell p {
+    line-height: 1.9;
+}
+
+.site-hero-lead {
+    font-size: 15.5px;
+    line-height: 2;
+}
+
+.site-section-title h2 {
+    font-size: 19px;
+}
+
+.site-nav a {
+    font-size: 14px;
+}
+
+.site-search-input,
+.site-side-search-input {
+    font-size: 13.5px;
+}
+
+.site-product-name {
+    font-size: 13.5px;
+}
+
+.site-product-code {
+    font-size: 11.5px;
+}
+
+.site-product-price {
+    font-size: 12.5px;
+}
+
+.site-product-cat {
+    font-size: 11px;
+}
+
+.site-product-bar {
+    min-height: 66px;
+}
+
+.site-side-name {
+    font-size: 13.5px;
+}
+
+.site-side-count {
+    font-size: 12px;
+}
+
+.site-table {
+    font-size: 13.5px;
+}
+
+.site-table th,
+.site-table td {
+    padding: 12px 14px;
+}
+
+.site-breadcrumb,
+.site-tag {
+    font-size: 12.5px;
+}
+
+.site-btn {
+    font-size: 13px;
+}
+
+.site-footer-inner {
+    font-size: 13.5px;
+}
+
+/* ---------- دسترس‌پذیری ---------- */
+
+/* حلقهٔ فوکوس باید در همه‌جا دیده شود؛ برخی ورودی‌ها outline را خاموش کرده‌اند. */
+.site-shell :is(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--site-red);
+    outline-offset: 2px;
+    border-radius: 8px;
+}
+
+.site-search-input:focus-visible,
+.site-side-search-input:focus-visible {
+    outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .site-shell *,
+    .site-shell *::before,
+    .site-shell *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    .site-product-card:hover {
+        transform: none;
+    }
+}
+
+/* ---------- سربرگ و منوی موبایل ---------- */
+
+/* چک‌باکس منو: از دید پنهان ولی برای صفحه‌خوان و کیبورد قابل دسترسی. */
+.site-nav-toggle {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.site-menu {
+    display: contents;
+}
+
+.site-nav-burger {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    margin-inline-start: auto;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 12px;
+    background: transparent;
+    color: #fff;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.site-nav-burger:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* ---------- هدر آگهی و آمار ---------- */
+
+.site-hero-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px 30px;
+    margin: 28px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.site-hero-stats li {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-inline-start: 14px;
+    border-inline-start: 2px solid rgba(255, 255, 255, 0.28);
+}
+
+.site-hero-stats b {
+    font-size: 20px;
+    font-weight: 700;
+    color: #fff;
+}
+
+.site-hero-stats span {
+    font-size: 12.5px;
+    color: #b9cae2;
+}
+
+.site-hero-art--photo {
+    width: 340px;
+    height: 340px;
+    border-radius: 30px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 24px 60px rgba(2, 10, 30, 0.45);
+}
+
+.site-hero-art--photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* ---------- مرتب‌سازی ---------- */
+
+.site-sort {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.site-sort-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--site-muted);
+}
+
+.site-sort-link {
+    padding: 6px 12px;
+    border: 1px solid var(--site-line);
+    border-radius: 999px;
+    background: var(--site-surface);
+    color: var(--site-ink);
+    font-size: 12.5px;
+    font-weight: 600;
+    transition: border-color 0.16s ease, color 0.16s ease, background 0.16s ease;
+}
+
+.site-sort-link:hover {
+    border-color: var(--site-navy);
+    color: var(--site-navy);
+}
+
+.site-sort-link.on {
+    background: var(--site-navy);
+    border-color: var(--site-navy);
+    color: #fff;
+}
+
+/* ---------- چیپ‌های فیلتر فعال ---------- */
+
+.site-chips {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.site-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: 1px solid var(--site-line);
+    border-radius: 999px;
+    background: var(--site-soft);
+    color: var(--site-ink);
+    font-size: 12.5px;
+    font-weight: 600;
+}
+
+.site-chip i.bi-x {
+    opacity: 0.55;
+}
+
+.site-chip:hover {
+    border-color: var(--site-red);
+    color: var(--site-red-dark);
+}
+
+.site-chips-clear {
+    font-size: 12.5px;
+    color: var(--site-muted);
+    text-decoration: underline;
+}
+
+.site-chips-clear:hover {
+    color: var(--site-red);
+}
+
+/* ---------- صفحه‌بندی عددی ---------- */
+
+.site-page-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 38px;
+    height: 38px;
+    padding: 0 10px;
+    border: 1px solid var(--site-line);
+    border-radius: 10px;
+    background: var(--site-surface);
+    color: var(--site-ink);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.site-page-num:hover {
+    border-color: var(--site-navy);
+    color: var(--site-navy);
+}
+
+.site-page-num.on {
+    background: var(--site-red);
+    border-color: var(--site-red);
+    color: #fff;
+}
+
+.site-pager-gap {
+    padding: 0 4px;
+    color: var(--site-muted);
+}
+
+/* ---------- گالری تصاویر محصول ---------- */
+
+.site-gallery {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.site-gallery-thumb {
+    width: 96px;
+    height: 72px;
+    border: 2px solid transparent;
+    border-radius: 12px;
+    background: var(--site-soft);
+    overflow: hidden;
+}
+
+.site-gallery-thumb img {
+    width: 100%;
+    height: 100%;
+    padding: 4px;
+    object-fit: contain;
+}
+
+.site-gallery-thumb:hover {
+    border-color: var(--site-navy);
+}
+
+.site-gallery-thumb.on {
+    border-color: var(--site-red);
+}
+
+/* ---------- صفحهٔ اول: معرفی و CTA ---------- */
+
+.site-about-teaser-inner {
+    padding: 30px;
+    border: 1px solid var(--site-line);
+    border-radius: var(--site-radius);
+    background: var(--site-surface);
+    box-shadow: 0 10px 26px var(--site-shadow);
+}
+
+.site-about-teaser h2 {
+    margin-bottom: 10px;
+    color: var(--site-heading);
+    font-size: 22px;
+}
+
+.site-about-teaser p {
+    max-width: 72ch;
+    margin-bottom: 18px;
+    color: var(--site-muted);
+}
+
+.site-cta-band {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    margin: 34px 0 10px;
+    padding: 26px 28px;
+    border-radius: var(--site-radius);
+    background: linear-gradient(120deg, var(--site-navy), #143f6b);
+    color: #fff;
+}
+
+.site-cta-band h2 {
+    margin-bottom: 6px;
+    color: #fff;
+    font-size: 21px;
+}
+
+.site-cta-band p {
+    margin: 0;
+    color: #c5d4e8;
+}
+
+/* ---------- صفحهٔ ۴۰۴ ---------- */
+
+.site-empty--404 {
+    padding: 56px 20px;
+}
+
+.site-404-code {
+    display: block;
+    color: var(--site-red);
+    font-size: 72px;
+    font-weight: 800;
+    line-height: 1;
+    opacity: 0.18;
+}
+
+.site-404-title {
+    margin: 12px 0 8px;
+    color: var(--site-heading);
+    font-size: 24px;
+}
+
+.site-404-path {
+    display: inline-block;
+    margin-top: 6px;
+    padding: 6px 10px;
+    border: 1px solid var(--site-line);
+    border-radius: 8px;
+    background: var(--site-soft);
+    color: var(--site-muted);
+    font-family: monospace;
+    font-size: 12.5px;
+    word-break: break-all;
+}
+
+.site-404-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.site-btn--ghost-light {
+    border-color: var(--site-line);
+    background: var(--site-surface);
+    color: var(--site-navy);
+}
+
+.site-btn--ghost-light:hover {
+    background: var(--site-soft);
+    color: var(--site-navy);
+}
+
+/* ---------- اطلاع پیش‌پر استعلام ---------- */
+
+.site-quote-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding: 12px 14px;
+    border: 1px solid #cfe0f7;
+    border-radius: 12px;
+    background: #eef5ff;
+    color: #123a63;
+    font-size: 13px;
+}
+
+html[data-theme="dark"] .site-quote-notice {
+    border-color: rgba(88, 140, 220, 0.35);
+    background: rgba(88, 140, 220, 0.14);
+    color: #cfe0f7;
+}
+
+/* ---------- ریسپانسیو سربرگ ---------- */
+
+@media (max-width: 1080px) {
+    .site-header {
+        height: 76px;
+    }
+
+    .site-header-inner {
+        flex-wrap: nowrap;
+        gap: 10px;
+        padding-block: 8px;
+    }
+
+    .site-nav-burger {
+        display: inline-flex;
+    }
+
+    .site-menu {
+        display: none;
+        position: absolute;
+        top: 100%;
+        inset-inline: 0;
+        max-height: 72vh;
+        overflow-y: auto;
+        padding: 14px 16px 18px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        background: var(--site-dark);
+        box-shadow: 0 18px 30px rgba(2, 10, 25, 0.35);
+    }
+
+    .site-nav-toggle:checked ~ .site-menu {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    .site-nav {
+        flex-direction: column;
+        flex-wrap: nowrap;
+        align-items: stretch;
+        justify-content: flex-start;
+        gap: 2px;
+        width: 100%;
+        overflow: visible;
+    }
+
+    .site-nav a {
+        padding: 12px 14px;
+        border-radius: 10px;
+        font-size: 14.5px;
+    }
+
+    .site-nav a.on::after {
+        display: none;
+    }
+
+    .site-menu .site-search {
+        width: 100%;
+        height: 44px;
+    }
+
+    .site-menu .site-search-input {
+        width: 100%;
+        max-width: none;
+        font-size: 14px;
+    }
+
+    .site-actions {
+        margin-inline-start: 0;
+        gap: 6px;
+    }
+
+    .site-hero-art--photo {
+        width: 260px;
+        height: 260px;
+    }
+}
+
+@media (max-width: 560px) {
+    .site-cta span,
+    .site-login span {
+        display: none;
+    }
+
+    .site-cta {
+        padding: 0 12px;
+    }
+
+    .site-hero-stats {
+        gap: 12px 18px;
+        margin-top: 22px;
+    }
+
+    .site-hero-stats b {
+        font-size: 17px;
+    }
+
+    .site-about-teaser-inner {
+        padding: 20px;
+    }
+
+    .site-cta-band {
+        padding: 20px;
+    }
+
+    .site-cta-band h2 {
+        font-size: 18px;
+    }
+
+    .site-gallery-thumb {
+        width: 78px;
+        height: 60px;
+    }
+
+    .site-sort {
+        width: 100%;
+    }
+}

@@ -1,4 +1,4 @@
-﻿using Ashianebargh.Domain.Common;
+using Ashianebargh.Domain.Common;
 
 namespace Ashianebargh.Domain.Content;
 
@@ -29,7 +29,13 @@ public class Product : AuditableEntity
  public bool IsFeatured { get; set; }
  public int SortOrder { get; set; }
 
- public ICollection<Tag> Tags { get; set; } = new List<Tag>();
+public ICollection<Tag> Tags { get; set; } = new List<Tag>();
 
 public ICollection<ProductFile> Files { get; set; } = new List<ProductFile>();
+
+/// <summary>ردیف‌های مشخصات فنی (کلید/مقدار) که در سایت جدول می‌شوند.</summary>
+public ICollection<ProductSpec> Specs { get; set; } = new List<ProductSpec>();
+
+/// <summary>تصاویر گالری (به‌جز تصویر اصلی).</summary>
+public ICollection<ProductImage> Images { get; set; } = new List<ProductImage>();
 }

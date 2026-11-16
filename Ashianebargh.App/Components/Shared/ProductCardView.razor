@@ -1,31 +1,44 @@
-@* کارت محصول مشترک صفحهٔ اول و فهرست محصولات. *@
+@* کارت محصول مشترک صفحهٔ اول، فهرست محصولات و صفحهٔ دسته. *@
 @using Ashianebargh.Application.Content
 @using Ashianebargh.Application.Helpers
 @using Ashianebargh.App.Services
 @inject SiteLanguage Language
 
+@{
+    // نسخهٔ انگلیسی فقط وقتی نمایش داده می‌شود که ترجمه ثبت شده باشد؛
+    // در غیر این صورت نام فارسی بهتر از فیلد خالی است.
+    var name = Language.IsEnglish && !string.IsNullOrWhiteSpace(Product.NameEn) ? Product.NameEn : Product.Name;
+}
+
 <a class="site-product-card" href="/product/@Product.Slug">
     <div class="site-product-media">
         @if (!string.IsNullOrEmpty(Product.MainImageStorageId))
         {
-            <img src="/media/products/@Product.MainImageStorageId" alt="@Product.Name" loading="lazy" />
+            @* alt خالی: نام محصول در همین لینک به‌صورت متن آمده و تکرار آن برای صفحه‌خوان مزاحم است.
+               srcset از endpoint ?w= استفاده می‌کند تا موبایل نسخهٔ کوچک را بگیرد. *@
+            <img src="/media/products/@(Product.MainImageStorageId)?w=480"
+                 srcset="/media/products/@(Product.MainImageStorageId)?w=160 160w,
+                         /media/products/@(Product.MainImageStorageId)?w=320 320w,
+                         /media/products/@(Product.MainImageStorageId)?w=480 480w"
+                 sizes="(max-width: 700px) 45vw, (max-width: 1080px) 30vw, 280px"
+                 alt="" width="400" height="300" loading="lazy" decoding="async" />
         }
         else
         {
-            <span class="site-product-placeholder"><i class="bi bi-box-seam"></i></span>
+            <span class="site-product-placeholder" aria-hidden="true"><i class="bi bi-box-seam"></i></span>
         }
         <span class="site-product-cat">@Product.CategoryName</span>
     </div>
     <div class="site-product-bar">
         <span class="site-product-info">
-            <span class="site-product-name" title="@Product.Name">@Product.Name</span>
+            <span class="site-product-name" title="@name">@name</span>
             @if (!string.IsNullOrWhiteSpace(Product.Code))
             {
                 <span class="site-product-code" dir="ltr">@Product.Code</span>
             }
             <span class="site-product-price">@(Product.Price is null ? Language["card.callForPrice"] : Language.FormatPrice(Product.Price.Value))</span>
         </span>
-        <span class="site-product-arrow"><i class="bi @Language.ForwardIcon"></i></span>
+        <span class="site-product-arrow" aria-hidden="true"><i class="bi @Language.ForwardIcon"></i></span>
     </div>
 </a>
 

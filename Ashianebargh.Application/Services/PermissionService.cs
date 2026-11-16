@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Ashianebargh.Domain.Identity;
 using Ashianebargh.Domain.Interfaces;
@@ -30,14 +31,24 @@ public class PermissionService : IPermissionService
     private readonly RoleManager<IdentityRole> _roleManager;
     private readonly IPermissionCatalog _catalog;
     private readonly IAshianebarghUnitOfWork _unitOfWork;
+    private readonly UserManager<ApplicationUser> _userManager;
+    private readonly IAuditService _audit;
+    private readonly IHttpContextAccessor _httpContext;
 
     public PermissionService(RoleManager<IdentityRole> roleManager, IPermissionCatalog catalog,
-        IAshianebarghUnitOfWork unitOfWork)
+        IAshianebarghUnitOfWork unitOfWork, UserManager<ApplicationUser> userManager,
+        IAuditService audit, IHttpContextAccessor httpContext)
     {
         _roleManager = roleManager;
         _catalog = catalog;
         _unitOfWork = unitOfWork;
+        _userManager = userManager;
+        _audit = audit;
+        _httpContext = httpContext;
     }
+
+    /// <summary>عامل فعلی (ادمین انجام‌دهنده) برای رد حسابرسی؛ بیرون از درخواست HTTP تهی است.</summary>
+    private string? ActorName => _httpContext.HttpContext?.User.Identity?.Name;
 
     public async Task<IReadOnlyList<PermissionStateDto>> GetPermissionStatesAsync(string roleName)
     {
@@ -97,6 +108,22 @@ public class PermissionService : IPermissionService
                         throw new PermissionUpdateAbortedException();
                     }
                 }
+
+                // مجوزهای نقش هنگام ورود در کوکی احراز هویت پخته می‌شوند؛ بدون باطل‌کردن
+                // stampِ کاربرانِ همین نقش، نشست‌های زنده تا لاگین بعدی مجوزهای قبلی را
+                // نگه می‌دارند (گرفتن مجوزِ تازه هم دیده نمی‌شد). این کار داخل همان تراکنش
+                // است تا «مجوز عوض شد ولی نشستِ کسی باطل نشد» پیش نیاید.
+                // تغییر مجوز نقش یک عملیات نادر ادمینی است، پس پیمایش کاربران نقش
+                // (نه همهٔ کاربران) هزینهٔ قابل قبولی دارد.
+                foreach (var member in await _userManager.GetUsersInRoleAsync(roleName))
+                {
+                    var stampResult = await _userManager.UpdateSecurityStampAsync(member);
+                    if (!stampResult.Succeeded)
+                    {
+                        failure = stampResult;
+                        throw new PermissionUpdateAbortedException();
+                    }
+                }
             });
         }
         catch (PermissionUpdateAbortedException)
@@ -104,6 +131,10 @@ public class PermissionService : IPermissionService
             _unitOfWork.ClearChangeTracker();
             return failure!;
         }
+
+        // تغییر مجوز یک رویداد امنیتی است و قبلاً هیچ رد حسابرسی نداشت.
+        await _audit.LogEventAsync("role.permissions-changed", ActorName,
+            $"مجوزهای نقش «{roleName}» به «{string.Join("، ", permissions.Distinct())}» تغییر کرد.");
 
         return IdentityResult.Success;
     }

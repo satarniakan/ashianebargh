@@ -6,7 +6,8 @@ public record OtpRequestApiDto(string PhoneNumber, string? CaptchaToken = null);
 public record OtpVerifyApiDto(string PhoneNumber, string Code, string? DeviceName);
 
 /// <summary>ورود موبایل با رمز (مسیر جایگزین وقتی پیامک قطع است).</summary>
-public record PasswordLoginApiDto(string Username, string Password, string? DeviceName = null);
+public record PasswordLoginApiDto(
+    string Username, string Password, string? DeviceName = null, string? CaptchaToken = null);
 
 /// <summary>تعیین رمز جدید با کد پیامکی (فراموشی رمز موبایل).</summary>
 public record PasswordResetApiDto(

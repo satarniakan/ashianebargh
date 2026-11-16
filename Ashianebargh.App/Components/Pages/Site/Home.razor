@@ -1,17 +1,25 @@
 @page "/"
+@attribute [AllowAnonymous]
 @layout SiteLayout
 @using Ashianebargh.Application.Content
 @using Ashianebargh.App.Services
+@using Ashianebargh.Domain.Identity
 @inject IProductService ProductService
 @inject ICategoryService CategoryService
+@inject ISettingService SettingService
+@inject IServiceScopeFactory ScopeFactory
 @inject SiteLanguage Language
+@inject NavigationManager Nav
+
 <PageTitle>@Language["home.title"]</PageTitle>
+<SeoMeta Title="@Language["home.title"]" Description="@Language["home.lead"]" Path="/" SiteName="@siteName"
+         JsonLd="@JsonLdBlocks" />
 
 <section class="site-hero">
     <div class="site-container site-hero-inner">
         <div class="site-hero-text">
             <div class="site-eyebrow">@Language["home.eyebrow"]</div>
-            <h1>آشیانه <span>برق</span></h1>
+            <h1>@FirstName <span>@RestName</span></h1>
             <p class="site-hero-lead">@Language["home.lead"]</p>
             <div class="site-hero-actions">
                 <a class="site-btn site-btn--red" href="/products">
@@ -23,12 +31,38 @@
                     @Language["home.contact"]
                 </a>
             </div>
+
+            <ul class="site-hero-stats">
+                <li>
+                    <b>@productCount.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)</b>
+                    <span>@Language["home.statsProducts"]</span>
+                </li>
+                <li>
+                    <b>@categories.Count.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)</b>
+                    <span>@Language["home.statsCategories"]</span>
+                </li>
+                <li>
+                    <b>@T("feat.support")</b>
+                    <span>@Language["home.statsSupport"]</span>
+                </li>
+            </ul>
         </div>
 
-        <div class="site-hero-art" aria-hidden="true">
-            <span class="site-hero-ring site-hero-ring--outer"></span>
-            <span class="site-hero-ring site-hero-ring--inner"></span>
-            <i class="bi bi-lightning-charge-fill"></i>
+        <div class="site-hero-art @(heroImage is null ? "" : "site-hero-art--photo")" aria-hidden="@(heroImage is null ? "true" : "false")">
+            @if (heroImage is not null)
+            {
+                <img src="/media/products/@heroImage?w=800"
+                     srcset="/media/products/@heroImage?w=480 480w,
+                             /media/products/@heroImage?w=800 800w"
+                     sizes="(max-width: 1080px) 260px, 340px"
+                     alt="" width="480" height="480" decoding="async" />
+            }
+            else
+            {
+                <span class="site-hero-ring site-hero-ring--outer"></span>
+                <span class="site-hero-ring site-hero-ring--inner"></span>
+                <i class="bi bi-lightning-charge-fill"></i>
+            }
         </div>
     </div>
 </section>
@@ -66,13 +100,17 @@
             </div>
 
             <div class="site-cats">
-                @foreach (var category in categories)
+                @foreach (var category in categories.Take(8))
                 {
-                    <a class="site-cat" href="/products?category=@category.Slug">
+                    <a class="site-cat" href="/category/@category.Slug">
                         <span class="site-cat-media">
                             @if (!string.IsNullOrEmpty(category.ImageStorageId))
                             {
-                                <img src="/media/products/@category.ImageStorageId" alt="" loading="lazy" />
+                                <img src="/media/products/@(category.ImageStorageId)?w=320"
+                                     srcset="/media/products/@(category.ImageStorageId)?w=160 160w,
+                                             /media/products/@(category.ImageStorageId)?w=320 320w"
+                                     sizes="(max-width: 700px) 45vw, 240px"
+                                     alt="" width="320" height="240" loading="lazy" decoding="async" />
                             }
                             else
                             {
@@ -113,15 +151,74 @@
             </div>
         }
     </section>
+
+    <section class="site-section site-about-teaser">
+        <div class="site-about-teaser-inner">
+            <div>
+                <h2>@Language["home.aboutTitle"]</h2>
+                <p>@Language["home.aboutLead"]</p>
+                <a class="site-btn site-btn--navy" href="/about">@Language["home.aboutMore"]</a>
+            </div>
+        </div>
+    </section>
+
+    <section class="site-cta-band">
+        <div>
+            <h2>@Language["home.ctaTitle"]</h2>
+            <p>@Language["home.ctaLead"]</p>
+        </div>
+        <a class="site-btn site-btn--red" href="/contact">
+            <i class="bi bi-headset"></i>@Language["home.ctaCall"]
+        </a>
+    </section>
 </div>
 
 @code {
     private List<ProductCardDto> featured = new();
     private List<CategoryListItemDto> categories = new();
+    private string siteName = "آشیانه برق";
+    private string? heroImage;
+    private int productCount;
+
+    private string T(string key) => Language[key];
+
+    /// <summary>داده‌ساختاریافتهٔ سازمان برای صفحهٔ اول (نام، آدرس و لوگو).</summary>
+    private IReadOnlyList<string> JsonLdBlocks =>
+    [
+        SeoJsonLd.Organization(
+            siteName,
+            Nav.ToAbsoluteUri("/").ToString(),
+            Nav.ToAbsoluteUri("/logo.png").ToString())
+    ];
+
+    /// <summary>واژهٔ نخست نام سایت؛ واژهٔ دوم با رنگ برند نمایش داده می‌شود.</summary>
+    private string FirstName => siteName.Split(' ', 2)[0];
+
+    private string RestName
+    {
+        get
+        {
+            var parts = siteName.Split(' ', 2);
+            return parts.Length > 1 ? parts[1] : string.Empty;
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
+        // قالب سایت (SiteLayout) هم‌زمان در حال رندر است و DbContext مشترک را
+        // نمی‌توان بین دو عملیات موازی به کار برد؛ پس داده‌ها در scope جداگانه گرفته می‌شوند.
+        await using (var scope = ScopeFactory.CreateAsyncScope())
+        {
+            var settings = scope.ServiceProvider.GetRequiredService<ISettingService>();
+            siteName = await settings.GetAsync(FrameworkSettingKeys.SiteName) ?? siteName;
+        }
+
         featured = await ProductService.GetFeaturedAsync(8);
         categories = await CategoryService.GetActiveAsync();
+
+        var total = await ProductService.GetPublicPagedAsync(new PublicProductFilter { Page = 1, PageSize = 1 });
+        productCount = total.TotalCount;
+
+        heroImage = featured.FirstOrDefault(p => !string.IsNullOrEmpty(p.MainImageStorageId))?.MainImageStorageId;
     }
 }

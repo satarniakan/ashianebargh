@@ -1,5 +1,7 @@
 @page "/{Slug}"
+@attribute [AllowAnonymous]
 @layout SiteLayout
+@using Microsoft.AspNetCore.Http
 @using Ashianebargh.Application.Content
 @using Ashianebargh.App.Services
 @inject IPageService PageService
@@ -8,31 +10,27 @@
 @if (view is null)
 {
     <PageTitle>@Language["page.notFoundTitle"]</PageTitle>
-    <div class="site-container">
-        <div class="site-empty">
-            <i class="bi bi-compass"></i>
-            <p>@Language["page.notFound"]</p>
-            <a href="/" class="btn btn-sm btn-outline-secondary">@Language["page.backHome"]</a>
-        </div>
-    </div>
+    <NotFoundContent From="@("/" + Slug)" />
 }
 else
 {
     var visual = PageVisual(view.Slug);
 
-    <PageTitle>@(Language.IsEnglish ? view.TitleEn : view.Title) | آشیانه برق</PageTitle>
+    <PageTitle>@Title | آشیانه برق</PageTitle>
+    <SeoMeta Title="@Title"
+             Description="@PageDescription" Path="@("/" + view.Slug)" Type="article" />
 
     <div class="site-container">
         <div class="site-page-head">
             <nav class="site-breadcrumb" aria-label="@Language["aria.breadcrumb"]">
                 <a href="/">@Language["common.home"]</a>
                 <span class="sep">/</span>
-                <span class="current">@(Language.IsEnglish ? view.TitleEn : view.Title)</span>
+                <span class="current">@Title</span>
             </nav>
-            <h1>@(Language.IsEnglish ? view.TitleEn : view.Title)</h1>
+            <h1>@Title</h1>
         </div>
 
-        @if (string.IsNullOrWhiteSpace(view.Content))
+        @if (string.IsNullOrWhiteSpace(Body))
         {
             <div class="site-empty">
                 <i class="bi bi-file-earmark-text"></i>
@@ -45,11 +43,11 @@ else
                 @if (visual is not null)
                 {
                     <figure class="site-page-visual">
-                        <img src="@visual" alt="@(Language.IsEnglish ? view.TitleEn : view.Title)" />
+                        <img src="@visual" alt="@Title" />
                     </figure>
                 }
                 <div class="content-panel">
-                    <ContentParagraphs Text="@(Language.IsEnglish ? view.ContentEn : view.Content)" />
+                    <ContentParagraphs Text="@Body" />
                 </div>
             </div>
         }
@@ -60,6 +58,25 @@ else
     [Parameter] public string Slug { get; set; } = string.Empty;
 
     private PageViewDto? view;
+
+    private string Title => LocalizedText.Pick(Language.IsEnglish, view?.TitleEn, view?.Title);
+
+    private string? Body =>
+        Language.IsEnglish && !string.IsNullOrWhiteSpace(view?.ContentEn) ? view.ContentEn : view?.Content;
+
+    private string? PageDescription
+    {
+        get
+        {
+            var content = Body;
+            if (string.IsNullOrWhiteSpace(content)) return Language["page.empty"];
+
+            var text = System.Text.RegularExpressions.Regex.Replace(content, "<[^>]+>", " ");
+            text = System.Net.WebUtility.HtmlDecode(text).Trim();
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ");
+            return text.Length <= 160 ? text : text[..157].TrimEnd() + "…";
+        }
+    }
 
     private static readonly Dictionary<string, string> Visuals = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -73,5 +90,7 @@ else
     private static string? PageVisual(string slug) => Visuals.GetValueOrDefault(slug);
 
     protected override async Task OnParametersSetAsync()
-        => view = await PageService.GetPublishedBySlugAsync(Slug);
+    {
+        view = await PageService.GetPublishedBySlugAsync(Slug);
+    }
 }

@@ -1,6 +1,7 @@
 @*
     روتر مشترک همهٔ صفحات (پایه + دامنه) در همین مونتاژ.
 *@
+@inject NavigationManager Nav
 <Router AppAssembly="@typeof(Routes).Assembly"
         AdditionalAssemblies="@AdditionalAssemblies">
     <Found Context="routeData">
@@ -13,9 +14,23 @@
         </AuthorizeRouteView>
     </Found>
     <NotFound>
-        <LayoutView Layout="@typeof(MainLayout)">
-            <Ashianebargh.App.Components.Pages.NotFound />
-        </LayoutView>
+        @* مسیرهای ناشناختهٔ بیرون از پنل نباید پوستهٔ مدیریتی (سایدبار) ببینند؛
+           برای مهمان همان ۴۰۴ عمومی سایت نمایش داده می‌شود. *@
+        @* کد وضعیت ۴۰۴ را خودِ NotFoundContent / NotFound ست می‌کنند (NotFoundStatus)،
+           چون انتساب مستقیم پیش از نوشتن پاسخ باعث می‌شود Blazor بدنه را دور بریزد
+           و re-execute به /404 هم endpoint را دوبار اجرا می‌کند. *@
+        @if (IsAdminArea)
+        {
+            <LayoutView Layout="@typeof(MainLayout)">
+                <Ashianebargh.App.Components.Pages.NotFound From="@AttemptedPath" />
+            </LayoutView>
+        }
+        else
+        {
+            <LayoutView Layout="@typeof(SiteLayout)">
+                <Ashianebargh.App.Components.Shared.NotFoundContent From="@AttemptedPath" />
+            </LayoutView>
+        }
     </NotFound>
 </Router>
 
@@ -23,4 +38,20 @@
     /// <summary>مونتاژهای اضافیِ حاوی صفحات (مثلاً مونتاژ پروژهٔ میزبان).</summary>
     [Parameter]
     public IEnumerable<System.Reflection.Assembly>? AdditionalAssemblies { get; set; }
+
+    /// <summary>آدرس درخواست‌شده (بدون ریشه) تا در صفحهٔ ۴۰۴ به کاربر نشان داده شود.</summary>
+    private string AttemptedPath => "/" + Nav.ToBaseRelativePath(Nav.Uri).Split('#')[0];
+
+    /// <summary>آیا مسیر درخواست زیر پنل مدیریت است؟ مبنای انتخاب پوستهٔ ۴۰۴.</summary>
+    private bool IsAdminArea
+    {
+        get
+        {
+            var path = Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0];
+            var first = path.Split('/', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+            return first is not null &&
+                   (first.Equals("admin", StringComparison.OrdinalIgnoreCase) ||
+                    first.Equals("dashboard", StringComparison.OrdinalIgnoreCase));
+        }
+    }
 }

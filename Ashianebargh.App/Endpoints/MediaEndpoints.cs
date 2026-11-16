@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.StaticFiles;
+using Ashianebargh.App.Services;
 using Ashianebargh.Application.Content;
 using Ashianebargh.Application.Services;
 using Ashianebargh.Domain.Content;
@@ -20,16 +21,20 @@ public static class MediaEndpoints
         app.MapGet("/media/products/{storageId}", async (
             HttpContext http,
             IFileStorage storage,
-            string storageId) =>
+            IProductService products,
+            ImageVariantService variants,
+            string storageId,
+            int? w,
+            CancellationToken cancellationToken) =>
         {
             if (!IsSafeStorageId(storageId))
                 return Results.NotFound();
 
-            if (!await storage.ExistsAsync(ContentStorage.Owner, ContentStorage.ProductImageType, storageId))
+            // فقط تصویر محصولِ فعال سرو می‌شود؛ محصول غیرفعال/پنهان نباید رسانه‌اش لو برود.
+            if (!await products.IsImagePublicAsync(storageId))
                 return Results.NotFound();
 
-            var stream = await storage.OpenReadAsync(ContentStorage.Owner, ContentStorage.ProductImageType, storageId);
-            if (stream is null)
+            if (!await storage.ExistsAsync(ContentStorage.Owner, ContentStorage.ProductImageType, storageId))
                 return Results.NotFound();
 
             if (!ContentTypes.TryGetContentType(storageId, out var contentType) ||
@@ -39,6 +44,25 @@ public static class MediaEndpoints
             http.Response.Headers.CacheControl = "public, max-age=604800, immutable";
             http.Response.Headers["X-Content-Type-Options"] = "nosniff";
 
+            // ?w= فقط عرض‌های مجاز را می‌پذیرد؛ در غیر این‌صورت همان فایل اصلی سرو می‌شود
+            // تا لینک‌های قدیمی/دست‌ساز هرگز ۴۰۴ نشوند.
+            if (w is int requestedWidth && ImageVariantService.IsAllowedWidth(requestedWidth))
+            {
+                var variantPath = await variants.GetOrCreateAsync(
+                    storageId,
+                    ct => storage.OpenReadAsync(ContentStorage.Owner, ContentStorage.ProductImageType, storageId),
+                    contentType,
+                    requestedWidth,
+                    cancellationToken);
+
+                if (variantPath is not null)
+                    return Results.File(variantPath, "image/webp");
+            }
+
+            var stream = await storage.OpenReadAsync(ContentStorage.Owner, ContentStorage.ProductImageType, storageId);
+            if (stream is null)
+                return Results.NotFound();
+
             return Results.Stream(stream, contentType);
         })
         .AllowAnonymous();
@@ -46,9 +70,14 @@ public static class MediaEndpoints
         app.MapGet("/media/product-files/{storageId}", async (
             HttpContext http,
             IFileStorage storage,
+            IProductService products,
             string storageId) =>
         {
             if (!IsSafeStorageId(storageId))
+                return Results.NotFound();
+
+            // فقط فایلِ محصولِ فعال سرو می‌شود (هم‌راستا با مسیر download که IsActive را چک می‌کند).
+            if (!await products.IsFilePublicAsync(storageId))
                 return Results.NotFound();
 
             if (!await storage.ExistsAsync(ContentStorage.Owner, ContentStorage.ProductFileType, storageId))

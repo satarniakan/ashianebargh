@@ -2,6 +2,13 @@
 @using Ashianebargh.App.Components.Shared
 @using Ashianebargh.App.Components.Layout
 
+@* دارایی‌های مخصوص پنل (تقویم شمسی و ورودی قیمت). عمداً اینجا هستند نه در App.razor،
+   تا صفحات عمومی سایت این اسکریپت/استایل اضافی را دانلود نکنند. *@
+<link rel="stylesheet" href="/lib/datepicker/datepicker.min.css" />
+<script src="/lib/datepicker/datepicker.min.js"></script>
+<script src="/persian-datepicker-interop.js"></script>
+<script src="/priceInput.js"></script>
+
 <div class="page">
     <div class="sidebar">
         @* منو بیرون باندیِ body است؛ بدون این گیت، خطای منو کل مدار را می‌اندازد *@
@@ -51,8 +58,11 @@
             <AuthorizeView>
                 <NotificationBell />
             </AuthorizeView>
-            <button class="theme-toggle" @onclick="ToggleTheme" title="تغییر تم روشن/تاریک" aria-label="تغییر تم">
-                <i class="bi @(isDark ? "bi-sun-fill" : "bi-moon-stars-fill")"></i>
+            @* تغییر تم عمداً جاوااسکریپتی (data-theme-toggle در site.js) است: در صفحه‌های
+               رندر استاتیک و بعد از قطع مدار Blazor هم باید کار کند. *@
+            <button type="button" class="theme-toggle" data-theme-toggle aria-pressed="false"
+                    title="تغییر تم روشن/تاریک" aria-label="تغییر تم">
+                <i class="bi bi-moon-stars-fill"></i>
             </button>
         </div>
         <article class="content px-4 py-4">
@@ -80,32 +90,6 @@
 
 @code {
     private AppErrorBoundary? errorBoundary;
-    private bool isDark;
-
-    [Inject]
-    private IJSRuntime JSRuntime { get; set; } = default!;
 
     private void Recover() => errorBoundary?.Recover();
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            try
-            {
-                isDark = await JSRuntime.InvokeAsync<string>("themeInterop.get") == "dark";
-                StateHasChanged();
-            }
-            catch (JSDisconnectedException) { }
-        }
-    }
-
-    private async Task ToggleTheme()
-    {
-        try
-        {
-            isDark = await JSRuntime.InvokeAsync<string>("themeInterop.toggle") == "dark";
-        }
-        catch (JSDisconnectedException) { }
-    }
 }

@@ -16,6 +16,9 @@ public interface IPageService
     Task<List<PageMenuItemDto>> GetMenuAsync();
     Task<PageViewDto?> GetPublishedBySlugAsync(string slug);
     Task<PageViewDto?> GetAboutAsync();
+
+    /// <summary>مسیر و تاریخ تغییر صفحات منتشرشده برای sitemap.xml.</summary>
+    Task<List<SitemapEntryDto>> GetPublicSitemapAsync();
 }
 
 public sealed class PageService(IContentUnitOfWork uow) : IPageService
@@ -228,4 +231,12 @@ public sealed class PageService(IContentUnitOfWork uow) : IPageService
                 p.Translations.FirstOrDefault(t => t.LanguageCode == "en")!.Content,
                 p.UpdatedAt))
             .FirstOrDefaultAsync();
+
+    public Task<List<SitemapEntryDto>> GetPublicSitemapAsync() =>
+        uow.Content.Pages.AsNoTracking()
+            // «درباره ما» مسیر ثابت /about دارد و نباید دوباره با slug خودش ظاهر شود.
+            .Where(p => p.IsPublished && p.Slug != Page.AboutSlug)
+            .OrderBy(p => p.SortOrder).ThenBy(p => p.Title)
+            .Select(p => new SitemapEntryDto("/" + p.Slug, p.UpdatedAt ?? p.CreatedAt))
+            .ToListAsync();
 }

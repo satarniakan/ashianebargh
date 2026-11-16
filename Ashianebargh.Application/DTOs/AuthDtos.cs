@@ -17,7 +17,10 @@ public enum ProfileUpdateStatus
     PasswordUpdateFailed,
 
     /// <summary>نشست جانشین (ادمینِ به‌جای کاربر) حق تعیین رمز ندارد.</summary>
-    ImpersonationBlocked
+    ImpersonationBlocked,
+
+    /// <summary>سقف تلاش برای نوشتن رمز در بازهٔ زمانی پر شده است.</summary>
+    TooManyPasswordAttempts
 }
 
 public record ProfileUpdateResult(ProfileUpdateStatus Status);

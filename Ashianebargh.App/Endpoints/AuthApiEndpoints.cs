@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Ashianebargh.Application.DTOs;
 using Ashianebargh.Application.Services;
+using Ashianebargh.Domain.Entities;
 using Ashianebargh.Domain.Exceptions;
 using Ashianebargh.Domain.Interfaces;
 
@@ -28,14 +29,14 @@ public static class AuthApiEndpoints
 
             try
             {
-                await auth.RequestOtpAsync(dto.PhoneNumber);
+                await auth.RequestOtpAsync(dto.PhoneNumber, OtpPurpose.ApiToken);
                 return Results.Ok(new { message = "کد ورود ارسال شد." });
             }
             catch (BusinessRuleException ex)
             {
                 return ApiProblem.BadRequest(ex.Message);
             }
-        }).RequireRateLimiting("otp-request");
+        }).RequireRateLimiting("otp-request").AllowAnonymous();
 
         group.MapPost("/otp/verify", async (
             HttpContext http,
@@ -57,14 +58,23 @@ public static class AuthApiEndpoints
             return result.Succeeded
                 ? Results.Ok(new TokenResponseDto(result.Token!, result.ExpiresAtUtc!.Value))
                 : ApiProblem.Unauthorized("کد ورود نامعتبر است.");
-        }).RequireRateLimiting("otp-verify");
+        }).RequireRateLimiting("otp-verify").AllowAnonymous();
 
         group.MapPost("/login", async (
             HttpContext http,
             IApiTokenService tokens,
             ILoginHistoryService history,
+            ICaptchaValidator captcha,
             PasswordLoginApiDto dto) =>
         {
+            // کپچا مثل مسیر وب: محدودیت نرخ IP-محور است و به‌تنهایی جلوی حدسِ
+            // توزیع‌شدهٔ رمز را نمی‌گیرد.
+            if (!await captcha.ValidateAsync(dto.CaptchaToken,
+                    http.Connection.RemoteIpAddress?.ToString()))
+            {
+                return ApiProblem.BadRequest("اعتبارسنجی امنیتی ناموفق بود.");
+            }
+
             var result = await tokens.LoginWithPasswordAndIssueTokenAsync(
                 dto.Username, dto.Password, dto.DeviceName);
 
@@ -80,7 +90,29 @@ public static class AuthApiEndpoints
             return result.Succeeded
                 ? Results.Ok(new TokenResponseDto(result.Token!, result.ExpiresAtUtc!.Value))
                 : ApiProblem.Unauthorized("نام کاربری یا رمز عبور نادرست است.");
-        }).RequireRateLimiting("login");
+        }).RequireRateLimiting("login").AllowAnonymous();
+
+        // مرحلهٔ ۱ تعیین رمز در اپ موبایل. جدا از /otp/request است چون کدِ ورود
+        // (هدف ApiToken) برای تعیین رمز پذیرفته نمی‌شود؛ هر هدف کد خودش را دارد.
+        group.MapPost("/password/reset/request", async (HttpContext http, IAuthService auth,
+            ICaptchaValidator captcha, OtpRequestApiDto dto) =>
+        {
+            if (!await captcha.ValidateAsync(dto.CaptchaToken,
+                    http.Connection.RemoteIpAddress?.ToString()))
+            {
+                return ApiProblem.BadRequest("اعتبارسنجی امنیتی ناموفق بود.");
+            }
+
+            try
+            {
+                await auth.RequestOtpAsync(dto.PhoneNumber, OtpPurpose.PasswordReset);
+                return Results.Ok(new { message = "کد تعیین رمز ارسال شد." });
+            }
+            catch (BusinessRuleException ex)
+            {
+                return ApiProblem.BadRequest(ex.Message);
+            }
+        }).RequireRateLimiting("otp-request").AllowAnonymous();
 
         group.MapPost("/password/reset", async (
             HttpContext http,
@@ -110,7 +142,7 @@ public static class AuthApiEndpoints
                 PasswordResetStatus.PasswordMismatch => ApiProblem.BadRequest("رمز و تکرار آن یکسان نیستند."),
                 _ => ApiProblem.BadRequest("تعیین رمز ناموفق بود.")
             };
-        }).RequireRateLimiting("otp-verify");
+        }).RequireRateLimiting("otp-verify").AllowAnonymous();
 
         group.MapGet("/tokens", async (ClaimsPrincipal user, IApiTokenService tokens) =>
         {

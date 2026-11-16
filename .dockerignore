@@ -15,6 +15,14 @@ Ashianebargh.App/Logs/
 Ashianebargh.App/SeedAssets/
 Ashianebargh.App/appsettings.json
 Ashianebargh.App/appsettings.Development.json
+# اسرار production هرگز وارد context/image نمی‌شوند. توجه: appsettings.Production.json
+# عمداً اینجا نیست — باید در ایمیج باشد (فقط Serilog/تنظیمات غیرمحرمانه دارد).
+.env
+.env.*
+*.pfx
+*.p12
+*.key
+*.pem
 *.user
 *.trx
 push.out.log

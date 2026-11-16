@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Ashianebargh.App.Services;
+using Ashianebargh.Application.Content;
 using Ashianebargh.Domain.Interfaces;
 
 namespace Ashianebargh.Tests;
@@ -31,6 +32,13 @@ public class DataRetentionJobTests
         public Mock<INotificationRepository> Notification { get; } = new();
         public Mock<IAuditLogRepository> AuditLog { get; } = new();
         public Mock<IOutboxRepository> Outbox { get; } = new();
+        public Mock<IProductService> Products { get; } = new();
+
+        /// <summary>ریشهٔ موقت کش نسخه‌های تصویر برای این اجرا.</summary>
+        public string VariantRoot { get; } =
+            Path.Combine(Path.GetTempPath(), $"ashretention-{Guid.NewGuid():N}");
+
+        public ImageVariantService Variants { get; }
 
         public Harness()
         {
@@ -39,12 +47,20 @@ public class DataRetentionJobTests
             Notification.Setup(r => r.DeleteReadOlderThanAsync(It.IsAny<DateTime>())).ReturnsAsync(0);
             AuditLog.Setup(r => r.DeleteOlderThanAsync(It.IsAny<DateTime>())).ReturnsAsync(0);
             Outbox.Setup(r => r.DeleteSentOlderThanAsync(It.IsAny<DateTime>())).ReturnsAsync(0);
+            Products.Setup(p => p.GetPublicImageStorageIdsAsync()).ReturnsAsync(new List<string>());
+
+            var variantConfig = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?> { ["Storage:RootPath"] = VariantRoot })
+                .Build();
+            Variants = new ImageVariantService(variantConfig, NullLogger<ImageVariantService>.Instance);
 
             Sp.Setup(s => s.GetService(typeof(ILoginHistoryRepository))).Returns(LoginHistory.Object);
             Sp.Setup(s => s.GetService(typeof(IApiTokenRepository))).Returns(ApiToken.Object);
             Sp.Setup(s => s.GetService(typeof(INotificationRepository))).Returns(Notification.Object);
             Sp.Setup(s => s.GetService(typeof(IAuditLogRepository))).Returns(AuditLog.Object);
             Sp.Setup(s => s.GetService(typeof(IOutboxRepository))).Returns(Outbox.Object);
+            Sp.Setup(s => s.GetService(typeof(IProductService))).Returns(Products.Object);
+            Sp.Setup(s => s.GetService(typeof(ImageVariantService))).Returns(Variants);
 
             Scope.Setup(s => s.ServiceProvider).Returns(Sp.Object);
             ScopeFactory.Setup(f => f.CreateScope()).Returns(Scope.Object);
@@ -136,5 +152,51 @@ public class DataRetentionJobTests
         h.Notification.Verify(r => r.DeleteReadOlderThanAsync(Now.AddDays(-7)), Times.Once);
         h.AuditLog.Verify(r => r.DeleteOlderThanAsync(Now.AddDays(-365)), Times.Once);
         h.Outbox.Verify(r => r.DeleteSentOlderThanAsync(Now.AddDays(-90)), Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_PrunesImageVariantsThatAreNoLongerPublic()
+    {
+        var h = new Harness();
+        // کش نسخه‌ها زیر «MediaVariants» در ریشهٔ Storage قرار می‌گیرد.
+        var cacheRoot = Path.Combine(h.VariantRoot, "MediaVariants");
+        Directory.CreateDirectory(cacheRoot);
+
+        var keptPath = Path.Combine(cacheRoot, "public.png.320.webp");
+        var orphanPath = Path.Combine(cacheRoot, "deleted.png.320.webp");
+        await File.WriteAllTextAsync(keptPath, "webp");
+        await File.WriteAllTextAsync(orphanPath, "webp");
+
+        // هر دو فایل قدیمی‌تر از مهلت ۳۰روزه‌اند تا سنجش، مهلت را هم پوشش دهد.
+        var old = new DateTime(2025, 10, 1, 0, 0, 0, DateTimeKind.Utc);
+        File.SetLastWriteTimeUtc(keptPath, old);
+        File.SetLastWriteTimeUtc(orphanPath, old);
+
+        h.Products.Setup(p => p.GetPublicImageStorageIdsAsync())
+            .ReturnsAsync(new List<string> { "public.png" });
+
+        var job = h.Build(Config(("Retention:ImageVariantDays", "30")), Now);
+        await job.ExecuteAsync(default);
+
+        Assert.True(File.Exists(keptPath), "نسخهٔ تصویر عمومی نباید حذف شود.");
+        Assert.False(File.Exists(orphanPath), "نسخهٔ تصویر غیرعمومی باید حذف شود.");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ImageVariantDaysZero_KeepsEverything()
+    {
+        var h = new Harness();
+        var cacheRoot = Path.Combine(h.VariantRoot, "MediaVariants");
+        Directory.CreateDirectory(cacheRoot);
+
+        var orphanPath = Path.Combine(cacheRoot, "deleted.png.320.webp");
+        await File.WriteAllTextAsync(orphanPath, "webp");
+        File.SetLastWriteTimeUtc(orphanPath, new DateTime(2025, 10, 1, 0, 0, 0, DateTimeKind.Utc));
+
+        var job = h.Build(Config(("Retention:ImageVariantDays", "0")), Now);
+        await job.ExecuteAsync(default);
+
+        Assert.True(File.Exists(orphanPath));
+        h.Products.Verify(p => p.GetPublicImageStorageIdsAsync(), Times.Never);
     }
 }

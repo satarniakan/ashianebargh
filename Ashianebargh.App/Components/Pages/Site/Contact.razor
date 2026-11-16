@@ -1,11 +1,14 @@
 @page "/contact"
+@attribute [AllowAnonymous]
 @layout SiteLayout
 @rendermode InteractiveServer
 @using Ashianebargh.Application.Content
 @using Ashianebargh.App.Services
 @inject IContactService ContactService
 @inject SiteLanguage Language
+@inject NavigationManager Nav
 <PageTitle>@Language["contact.title"]</PageTitle>
+<SeoMeta Title="@Language["contact.h1"]" Description="@Language["contact.lead"]" Path="/contact" Type="website" />
 
 <div class="site-container">
     <div class="site-page-head">
@@ -115,6 +118,14 @@
                     </div>
                 }
 
+                @if (!string.IsNullOrWhiteSpace(quotedProductName))
+                {
+                    <div class="site-quote-notice">
+                        <i class="bi bi-info-circle"></i>
+                        <span>@Language["contact.quoteNotice"].Replace("{0}", quotedProductName)</span>
+                    </div>
+                }
+
                 @if (!submitted)
                 {
                     <EditForm Model="form" OnValidSubmit="SubmitAsync">
@@ -127,6 +138,8 @@
                             <AppTextArea Label="@Language["form.message"]" @bind-Value="form.Message" Rows="5" Required ShowCount
                                          WrapperClass="site-field site-field--full" />
                         </div>
+
+                        <TurnstileWidget />
 
                         <button type="submit" class="btn btn-primary" disabled="@sending">
                             <i class="bi bi-send me-1"></i>
@@ -157,10 +170,13 @@
     private readonly List<(string Title, string Icon, string Url)> socialLinks = new();
     private bool sending;
     private bool submitted;
+    private bool prefillChecked;
+    private string? quotedProductName;
 
     private string? MapUrl => ToHttpUrl(info?.MapUrl);
 
     [Inject] private IContactService Service { get; set; } = default!;
+    [Inject] private IProductService ProductService { get; set; } = default!;
 
     protected override async Task OnInitializedAsync()
     {
@@ -169,6 +185,34 @@
         AddSocial(Language["social.instagram"], "bi-instagram", info.Instagram);
         AddSocial(Language["social.telegram"], "bi-telegram", info.Telegram);
         AddSocial(Language["social.whatsapp"], "bi-whatsapp", info.WhatsApp);
+    }
+
+    /// <summary>
+    /// اگر کاربر از صفحهٔ محصول آمده باشد (‎/contact?product=slug‎)، موضوع و متن
+    /// پیام با نام محصول پیش‌پر می‌شود تا استعلام یک کلیک کمتر بخواهد.
+    /// </summary>
+    protected override async Task OnParametersSetAsync()
+    {
+        if (prefillChecked) return;
+        prefillChecked = true;
+
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(new Uri(Nav.Uri).Query);
+        if (!query.TryGetValue("product", out var slug) || string.IsNullOrWhiteSpace(slug)) return;
+
+        var product = await ProductService.GetPublicBySlugAsync(slug.ToString());
+        if (product is null) return;
+
+        var name = Language.IsEnglish && !string.IsNullOrWhiteSpace(product.NameEn) ? product.NameEn : product.Name;
+        quotedProductName = name;
+
+        if (string.IsNullOrWhiteSpace(form.Subject))
+        {
+            form.Subject = Language["contact.subjectQuote"].Replace("{0}", name);
+        }
+        if (string.IsNullOrWhiteSpace(form.Message))
+        {
+            form.Message = Language["contact.quoteMessage"].Replace("{0}", name);
+        }
     }
 
     private void AddSocial(string title, string icon, string? value)
@@ -195,7 +239,9 @@
         sending = true;
         try
         {
-            await Service.SubmitAsync(form);
+            // توکن کپچا از ویجت Turnstile خوانده می‌شود (در توسعه بدون کلید، خالی است).
+            var captchaToken = await JS.InvokeAsync<string>("siteInterop.getCaptchaToken");
+            await Service.SubmitAsync(form, captchaToken);
             form = new();
             submitted = true;
         }
@@ -210,4 +256,5 @@
     }
 
     [Inject] private Ashianebargh.App.Services.ToastService ToastService { get; set; } = default!;
+    [Inject] private IJSRuntime JS { get; set; } = default!;
 }

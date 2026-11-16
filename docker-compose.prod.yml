@@ -10,6 +10,15 @@ services:
     restart: unless-stopped
     environment:
       MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?MSSQL_SA_PASSWORD در .env لازم است}
+    # فقط شبکهٔ backend (بدون دسترسی بیرونی)؛ proxy هرگز مستقیم به دیتابیس نمی‌رسد.
+    networks: [backend]
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   redis:
     # در پروداکشن نه پورت بیرونی دارد، نه بدون رمز اجرا می‌شود؛
@@ -22,6 +31,14 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD در .env لازم است}
     healthcheck:
       test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+    networks: [backend]
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   web:
     restart: unless-stopped
@@ -29,7 +46,10 @@ services:
     ports: !reset []
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__Default: "Server=sqlserver;Database=AshianebarghProd;User Id=sa;Password=${MSSQL_SA_PASSWORD:?MSSQL_SA_PASSWORD در .env لازم است};TrustServerCertificate=True"
+      # Encrypt=True ترافیک دیتابیس را رمزنگاری می‌کند. TrustServerCertificate پیش‌فرض true است
+      # چون گواهی SQL Serverِ کانتینر self-signed است؛ با گواهی معتبر سازمانی APP_SQL_TRUST_CERT=false
+      # بگذارید. توصیهٔ production: به‌جای sa یک login کم‌مجوز (فقط db_owner روی همین DB) بسازید.
+      ConnectionStrings__Default: "Server=sqlserver;Database=AshianebarghProd;User Id=sa;Password=${MSSQL_SA_PASSWORD:?MSSQL_SA_PASSWORD در .env لازم است};Encrypt=True;TrustServerCertificate=${APP_SQL_TRUST_CERT:-true}"
       ConnectionStrings__Redis: "redis:6379,password=${REDIS_PASSWORD:?REDIS_PASSWORD در .env لازم است},abortConnect=false"
       Identity__FirstAdminPhoneNumber: ${APP_ADMIN_PHONE:?APP_ADMIN_PHONE در .env لازم است}
       # جانشینی ادمین در پروداکشن پیش‌فرض خاموش است؛ فقط برای پنجرهٔ پشتیبانی روشن کنید.
@@ -41,18 +61,48 @@ services:
       Captcha__Turnstile__SecretKey: ${APP_TURNSTILE_SECRET_KEY:?APP_TURNSTILE_SECRET_KEY در .env لازم است}
       Captcha__Turnstile__SiteKey: ${APP_TURNSTILE_SITE_KEY:?APP_TURNSTILE_SITE_KEY در .env لازم است}
       Security__Pepper: ${APP_SECURITY_PEPPER:?APP_SECURITY_PEPPER در .env لازم است}
+      # پیامک واقعی اجباری است: با Fake هیچ کدی ارسال نمی‌شود ولی پاسخ کاربر
+      # «کد ارسال شد» می‌ماند و ادمین اول نمی‌تواند وارد شود (بن‌بست خاموش).
+      Sms__Provider: ${APP_SMS_PROVIDER:-Kavenegar}
+      Sms__Kavenegar__ApiKey: ${APP_KAVENEGAR_API_KEY:?APP_KAVENEGAR_API_KEY در .env لازم است}
       # تنها proxy داخل شبکهٔ compose به اپ می‌رسد، پس هدرهای forwarded او پذیرفته
       # می‌شوند تا IP واقعی کاربر برای rate limit و لاگ در دسترس باشد.
       ForwardedHeaders__TrustAllProxies: "true"
       # مایگریشن بهطور پیشفرض هنگام استارتاپ اجرا میشود. قبل از بالا آوردن چند نسخهٔ
       # همزمان، این را false کنید و مایگریشن را یکبار و جداگانه اجرا نمایید.
       Database__AutoMigrate: ${APP_AUTO_MIGRATE:-true}
+      # ضد host-header injection: فقط دامنهٔ عمومی پذیرفته می‌شود. localhost/127.0.0.1
+      # برای healthcheck داخل کانتینر لازم است (اپ پورت بیرونی ندارد، پس این‌ها از بیرون نمی‌رسند).
+      AllowedHosts: "${APP_DOMAIN:?APP_DOMAIN در .env لازم است};localhost;127.0.0.1"
+      # پشتیبانِ appsettings.Production.json: سطح لاگ System/Microsoft=Warning تا کلید
+      # کاوه‌نگار که داخل URL درخواست است، توسط لاگ HttpClient ثبت نشود.
+      Serilog__MinimumLevel__Override__Microsoft: "Warning"
+      Serilog__MinimumLevel__Override__System: "Warning"
+      # رمزنگاری کلیدهای DataProtection در حال سکون (اختیاری). خالی یعنی غیرفعال؛
+      # در صورت تنظیم، فایل گواهی باید داخل کانتینر در همان مسیر مونت شده باشد.
+      DataProtection__CertificatePath: ${APP_DATAPROTECTION_CERT_PATH:-}
+      DataProtection__CertificatePassword: ${APP_DATAPROTECTION_CERT_PASSWORD:-}
     volumes:
       # داده‌های آپلودی اپ باید بین استقرارها بمانند؛ بدون این ولوِل هر redeploy فایل‌ها را پاک می‌کند.
       - appdata:/app/AppData
       # کلیدهای DataProtection بیرون از کانتینر می‌مانند تا با هر redeploy
       # کوکی‌ها، توکن‌های ضدجعل و secretهای رمزنگاری‌شده نپرند.
       - dataprotection:/app/DataProtection-Keys
+    networks: [frontend, backend]
+    security_opt:
+      - no-new-privileges:true
+    # آمادگی اپ (شامل مایگریشن) پیش از پذیرش ترافیک؛ proxy تا healthy شدن web صبر می‌کند.
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # خاتمهٔ TLS: Caddy با HTTPS خودکار (نیازمند دامنهٔ عمومی و پورت‌های 80/443).
   # کوکی Secure در Production تنها روی HTTPS می‌نشیند، پس بدون این لایه ورود وب کار نمی‌کند.
@@ -66,8 +116,24 @@ services:
     volumes:
       - caddydata:/data
       - caddyconfig:/config
+    # فقط شبکهٔ frontend؛ به backend (دیتابیس/redis) دسترسی ندارد.
+    networks: [frontend]
+    security_opt:
+      - no-new-privileges:true
     depends_on:
-      - web
+      web:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  frontend:
+  backend:
+    # لایهٔ داده بدون egress اینترنتی؛ فقط web (که روی frontend هم هست) به آن می‌رسد.
+    internal: true
 
 volumes:
   dataprotection:

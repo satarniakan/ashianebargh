@@ -1,4 +1,5 @@
 @page "/products"
+@attribute [AllowAnonymous]
 @layout SiteLayout
 @using Ashianebargh.Application.Content
 @using Ashianebargh.Application.DTOs
@@ -7,14 +8,31 @@
 @inject ICategoryService CategoryService
 @inject ITagService TagService
 @inject SiteLanguage Language
+
 <PageTitle>@Language["products.title"]</PageTitle>
+<SeoMeta Title="@Language["products.h1"]" Description="@Language["products.lead"]" Path="/products" Type="website" />
+
+@{
+    var activeCategory = categories.FirstOrDefault(c => string.Equals(c.Slug, Category, StringComparison.OrdinalIgnoreCase));
+    var activeTag = tags.FirstOrDefault(t => string.Equals(t.Slug, Tag, StringComparison.OrdinalIgnoreCase));
+    var hasFilter = !string.IsNullOrEmpty(Category) || !string.IsNullOrEmpty(Tag) || !string.IsNullOrWhiteSpace(Search);
+}
 
 <div class="site-container">
     <div class="site-page-head">
         <nav class="site-breadcrumb" aria-label="@Language["aria.breadcrumb"]">
             <a href="/">@Language["common.home"]</a>
             <span class="sep">/</span>
-            <span class="current">@Language["products.h1"]</span>
+            @if (activeCategory is not null)
+            {
+                <a href="/products">@Language["nav.products"]</a>
+                <span class="sep">/</span>
+                <span class="current">@activeCategory.Name</span>
+            }
+            else
+            {
+                <span class="current">@Language["products.h1"]</span>
+            }
         </nav>
         <h1>@Language["products.h1"]</h1>
         <p>@Language["products.lead"]</p>
@@ -26,19 +44,31 @@
                 <input class="site-side-search-input" type="search" name="q"
                        placeholder="@Language["search.placeholder"]" aria-label="@Language["search.placeholder"]"
                        value="@Search" />
+                @if (!string.IsNullOrEmpty(Category))
+                {
+                    <input type="hidden" name="category" value="@Category" />
+                }
+                @if (!string.IsNullOrEmpty(Tag))
+                {
+                    <input type="hidden" name="tag" value="@Tag" />
+                }
+                @if (!string.IsNullOrEmpty(Sort))
+                {
+                    <input type="hidden" name="sort" value="@Sort" />
+                }
                 <button class="site-side-search-btn" type="submit" aria-label="@Language["search.button"]">
                     <i class="bi bi-search"></i>
                 </button>
             </form>
             <div class="site-side-head"><h2>@Language["side.categories"]</h2></div>
             <nav class="site-side-nav" aria-label="@Language["aria.categories"]">
-                <a class="@(string.IsNullOrEmpty(Category) ? "on" : "")" href="@ListUrl(null, Tag, 1)">
+                <a class="@(string.IsNullOrEmpty(Category) ? "on" : "")" href="@ListUrl(null, Tag, 1, Sort)">
                     <span class="site-side-icon"><i class="bi bi-grid-3x3-gap"></i></span>
                     <span class="site-side-name">@Language["common.allProducts"]</span>
                 </a>
                 @foreach (var category in categories)
                 {
-                    <a class="@(Category == category.Slug ? "on" : "")" href="@ListUrl(category.Slug, Tag, 1)">
+                    <a class="@(Category == category.Slug ? "on" : "")" href="/category/@category.Slug">
                         <span class="site-side-icon"><i class="bi bi-diagram-3"></i></span>
                         <span class="site-side-name">@category.Name</span>
                         <span class="site-side-count">@category.ProductCount</span>
@@ -51,10 +81,10 @@
                 <div class="site-side-tags">
                     <h3>@Language["side.tags"]</h3>
                     <div class="site-tag-list">
-                        <a class="site-tag @(string.IsNullOrEmpty(Tag) ? "on" : "")" href="@ListUrl(Category, null, 1)">@Language["side.all"]</a>
+                        <a class="site-tag @(string.IsNullOrEmpty(Tag) ? "on" : "")" href="@ListUrl(Category, null, 1, Sort)">@Language["side.all"]</a>
                         @foreach (var tag in tags)
                         {
-                            <a class="site-tag @(Tag == tag.Slug ? "on" : "")" href="@ListUrl(Category, tag.Slug, 1)">@tag.Name</a>
+                            <a class="site-tag @(Tag == tag.Slug ? "on" : "")" href="@ListUrl(Category, tag.Slug, 1, Sort)">@tag.Name</a>
                         }
                     </div>
                 </div>
@@ -92,11 +122,43 @@
                             @Language.ProductCount(result.TotalCount)
                         }
                     </span>
-                    @if (!string.IsNullOrEmpty(Category) || !string.IsNullOrEmpty(Tag) || !string.IsNullOrEmpty(Search))
-                    {
-                        <a class="site-clear" href="/products"><i class="bi bi-x-circle"></i>@Language["products.clear"]</a>
-                    }
+
+                    <SiteSortBar SortKey="SortKey" UrlFor="key => ListUrl(Category, Tag, 1, key)" />
                 </div>
+
+                @if (hasFilter)
+                {
+                    <div class="site-chips" aria-label="@Language["filter.active"]">
+                        @if (activeCategory is not null)
+                        {
+                            <a class="site-chip" href="@ListUrl(null, Tag, 1, Sort)">
+                                <i class="bi bi-diagram-3"></i>
+                                <span>@activeCategory.Name</span>
+                                <i class="bi bi-x" aria-hidden="true"></i>
+                                <span class="visually-hidden">@Language["filter.remove"]</span>
+                            </a>
+                        }
+                        @if (activeTag is not null)
+                        {
+                            <a class="site-chip" href="@ListUrl(Category, null, 1, Sort)">
+                                <i class="bi bi-tag"></i>
+                                <span>@activeTag.Name</span>
+                                <i class="bi bi-x" aria-hidden="true"></i>
+                                <span class="visually-hidden">@Language["filter.remove"]</span>
+                            </a>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Search))
+                        {
+                            <a class="site-chip" href="@ListUrl(Category, Tag, 1, Sort)">
+                                <i class="bi bi-search"></i>
+                                <span>@Search</span>
+                                <i class="bi bi-x" aria-hidden="true"></i>
+                                <span class="visually-hidden">@Language["filter.remove"]</span>
+                            </a>
+                        }
+                        <a class="site-chips-clear" href="/products">@Language["products.clear"]</a>
+                    </div>
+                }
 
                 <div class="site-grid">
                     @foreach (var product in result.Items)
@@ -107,17 +169,8 @@
 
                 @if (result.TotalPages > 1)
                 {
-                    <nav class="site-pager" aria-label="@Language["aria.pagination"]">
-                        <a class="site-page-btn @(result.HasPreviousPage ? "" : "disabled")"
-                           href="@ListUrl(Category, Tag, result.Page - 1)">
-                            <i class="bi @Language.PreviousIcon"></i> @Language["pager.previous"]
-                        </a>
-                        <span class="site-pager-info">@Language.PageOf(result.Page, result.TotalPages)</span>
-                        <a class="site-page-btn @(result.HasNextPage ? "" : "disabled")"
-                           href="@ListUrl(Category, Tag, result.Page + 1)">
-                            @Language["pager.next"] <i class="bi @Language.NextIcon"></i>
-                        </a>
-                    </nav>
+                    <SitePager Page="result.Page" TotalPages="result.TotalPages"
+                               UrlFor="page => ListUrl(Category, Tag, page, Sort)" />
                 }
             }
         </section>
@@ -129,10 +182,17 @@
     [SupplyParameterFromQuery(Name = "tag")] public string? Tag { get; set; }
     [SupplyParameterFromQuery(Name = "page")] public int PageNumber { get; set; } = 1;
     [SupplyParameterFromQuery(Name = "q")] public string? Search { get; set; }
+    [SupplyParameterFromQuery(Name = "sort")] public string? Sort { get; set; }
+
+    private static readonly string[] ValidSorts = ["", "newest", "price-asc", "price-desc"];
 
     private PagedResult<ProductCardDto>? result;
     private List<CategoryListItemDto> categories = new();
     private List<TagListItemDto> tags = new();
+
+    /// <summary>کلید مرتب‌سازی معتبر؛ مقدار ناشناخته در URL به پیشنهاد پیش‌فرض برمی‌گردد.</summary>
+    private string SortKey =>
+        ValidSorts.Contains(Sort ?? string.Empty, StringComparer.Ordinal) ? Sort ?? string.Empty : string.Empty;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -144,16 +204,18 @@
             CategorySlug = Category,
             TagSlug = Tag,
             Search = Search,
+            Sort = SortKey,
             Page = PageNumber < 1 ? 1 : PageNumber
         });
     }
 
-    private string ListUrl(string? category, string? tag, int pageNumber)
+    private string ListUrl(string? category, string? tag, int pageNumber, string? sort)
     {
         var query = new List<string>();
         if (!string.IsNullOrEmpty(category)) query.Add("category=" + Uri.EscapeDataString(category));
         if (!string.IsNullOrEmpty(tag)) query.Add("tag=" + Uri.EscapeDataString(tag));
-        if (!string.IsNullOrEmpty(Search)) query.Add("q=" + Uri.EscapeDataString(Search));
+        if (!string.IsNullOrWhiteSpace(Search)) query.Add("q=" + Uri.EscapeDataString(Search));
+        if (!string.IsNullOrEmpty(sort)) query.Add("sort=" + Uri.EscapeDataString(sort));
         if (pageNumber > 1) query.Add("page=" + pageNumber);
         return query.Count == 0 ? "/products" : "/products?" + string.Join("&", query);
     }

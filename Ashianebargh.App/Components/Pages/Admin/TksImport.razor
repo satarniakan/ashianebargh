@@ -1,6 +1,7 @@
 @page "/admin/tks-import"
 @rendermode InteractiveServer
-@attribute [Authorize(Policy = Ashianebargh.Domain.Content.ContentPermissions.Pages)]
+@* وارد کردن انبوه از سایت بیرونی عملیات حساس است؛ مثل منو فقط ادمین. *@
+@attribute [Authorize(Roles = Ashianebargh.Domain.Identity.Roles.Admin)]
 @using Ashianebargh.Application.Content
 @using Ashianebargh.App.Services
 @inject ITksImportService ImportService

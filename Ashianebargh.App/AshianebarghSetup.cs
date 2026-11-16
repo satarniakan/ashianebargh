@@ -66,6 +66,10 @@ public static class AshianebarghSetup
         });
         services.AddScoped<ITksImportService, TksImportService>();
 
+        // ساخت نسخه‌های کوچک‌شدهٔ تصاویر محصول (srcset). سرویس سبک است ولی ساخت
+        // نسخهٔ جدید I/O و CPU دارد؛ scoped می‌ماند تا با logging درخواست هم‌تراز باشد.
+        services.AddScoped<ImageVariantService>();
+
         // Feature Flags (Microsoft.FeatureManagement) — بخش‌های اختیاری را بدون تغییر کد روشن/خاموش کنید
         services.AddFeatureManagement();
 
@@ -100,6 +104,19 @@ public static class AshianebarghSetup
                     IdentityConstants.ApplicationScheme,
                     ApiTokenAuthenticationHandler.SchemeName)
                 .RequireAuthenticatedUser());
+
+        // deny-by-default: هر endpoint/صفحه‌ای که صراحتاً «عمومی» علامت نخورده،
+        // ورود می‌خواهد. این تور ایمنی است تا مسیر جدیدِ فراموش‌شده تصادفاً عمومی
+        // نماند. مسیرهای عمومی با [AllowAnonymous] / .AllowAnonymous() مشخص شده‌اند
+        // (صفحه‌های سایت، فرم‌های ورود، رسانه، /health، /lang و دارایی‌های استاتیک).
+        // نکته: سیاست fallback فقط روی endpointهایی اعمال می‌شود که هیچ متادیتای
+        // مجوزدهی ندارند؛ مسیرهای دارای RequireAuthorization/Authorize از policy خودشان استفاده می‌کنند.
+        services.Configure<AuthorizationOptions>(options =>
+        {
+            options.FallbackPolicy = new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .Build();
+        });
 
         // سیاست‌ساز خودکار: هر کلید IPermissionCatalog خودش یک policy است.
         // باید بعد از AddAuthorization بیاید تا جایگزین provider پیش‌فرض شود.
@@ -150,8 +167,10 @@ public static class AshianebarghSetup
                         QueueLimit = 0
                     }));
 
-            // تکمیل پروفایل/گذاشتن رمز — عملیات گرانِ bcrypt است و قبلاً هیچ محدودیتی نداشت،
+            // تکمیل پروفایل/گذاشتن رمز — عملیات گرانِ PBKDF2 است و قبلاً هیچ محدودیتی نداشت،
             // پس یک اسکریپت می‌توانست با درخواست‌های مکرر، CPU سرور را بسوزاند.
+            // توجه: این policy فقط مسیر HTTP را می‌پوشاند؛ صفحهٔ پروفایل circuit بلazor است
+            // و رویدادهایش از اینجا رد نمی‌شوند، پس سقفِ آن مسیر داخل AuthService است.
             options.AddPolicy("profile", httpContext =>
                 RateLimitPartition.GetFixedWindowLimiter(
                     partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",

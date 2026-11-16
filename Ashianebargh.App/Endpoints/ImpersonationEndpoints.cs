@@ -65,7 +65,8 @@ public static class ImpersonationEndpoints
             UserManager<ApplicationUser> users,
             SignInManager<ApplicationUser> signIn,
             IImpersonationService impersonation,
-            ILoginHistoryService history) =>
+            ILoginHistoryService history,
+            IAuditService audit) =>
         {
             var adminId = user.FindFirstValue(ImpersonationClaims.Impersonator);
             if (adminId is null) return Results.BadRequest(new { message = "نشست جانشین نیست." });
@@ -73,11 +74,19 @@ public static class ImpersonationEndpoints
             var admin = await users.FindByIdAsync(adminId);
             if (admin is null) return Results.Unauthorized();
 
+            // شناسهٔ کاربرِ جانشین‌شده پیش از بازگشت به نشست ادمین گرفته می‌شود؛
+            // بعد از SignInAsync، user جاری دیگر ادمین است نه کاربر هدف.
+            var impersonatedId = user.FindFirstValue(ClaimTypes.NameIdentifier);
+
             await signIn.SignInAsync(admin, isPersistent: true);
 
             await history.RecordAsync(admin.Id, admin.UserName, true, "Impersonation",
                 http.Connection.RemoteIpAddress?.ToString(),
                 http.Request.Headers.UserAgent.ToString());
+
+            // پایان جانشینی هم مثل شروعش ثبت می‌شود تا بازهٔ «ورود به‌جای کاربر» کامل auditable باشد.
+            await audit.LogEventAsync("impersonation-end", null,
+                $"ادمین {adminId} از جانشینیِ کاربر {impersonatedId} خارج شد.", actorId: adminId);
 
             return Results.Redirect("/admin/users");
         }).WithMetadata(new RequireAntiforgeryTokenAttribute()).RequireAuthorization();

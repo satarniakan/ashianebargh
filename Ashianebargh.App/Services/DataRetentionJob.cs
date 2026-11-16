@@ -1,3 +1,4 @@
+using Ashianebargh.Application.Content;
 using Ashianebargh.Application.Jobs;
 using Ashianebargh.Domain.Interfaces;
 
@@ -22,6 +23,12 @@ public class DataRetentionJob : IRecurringJob
         public const int ApiTokenDays = 90;
         public const int AuditLogDays = 730;
         public const int OutboxDays = 90;
+
+        /// <summary>
+        /// مهلت نگه‌داری نسخه‌های کوچک‌شدهٔ تصویر که دیگر به محصولی عمومی تعلق ندارند
+        /// (تصویر پاک/محصول غیرفعال شده). مهلت دارد تا رقابت با رندر هم‌زمان رخ ندهد.
+        /// </summary>
+        public const int ImageVariantDays = 30;
     }
 
     public string Name => "data-retention";
@@ -74,6 +81,34 @@ public class DataRetentionJob : IRecurringJob
 
         if (deleted > 0)
             _logger.LogInformation("خانه‌تکانی داده: {Count} ردیف حذف شد", deleted);
+
+        // کش نسخه‌های کوچک‌شدهٔ تصویر از جنس «فایل» است نه «ردیف»؛ پس مسیر جدا دارد.
+        await PruneImageVariantsAsync(sp, now);
+    }
+
+    /// <summary>
+    /// پاک‌سازی فایل‌های کش تصویر که تصویر مبدأشان دیگر عمومی نیست.
+    /// شکست این مرحله (مثلاً نبود دسترسی به دیسک) نباید بقیهٔ خانه‌تکانی را بشکند.
+    /// </summary>
+    private async Task PruneImageVariantsAsync(IServiceProvider sp, DateTime now)
+    {
+        var days = _configuration.GetValue("Retention:ImageVariantDays", Defaults.ImageVariantDays);
+        if (days <= 0)
+            return;
+
+        try
+        {
+            var keep = (await sp.GetRequiredService<IProductService>().GetPublicImageStorageIdsAsync())
+                .ToHashSet(StringComparer.Ordinal);
+
+            var removed = sp.GetRequiredService<ImageVariantService>().Prune(keep, now.AddDays(-days));
+            if (removed > 0)
+                _logger.LogInformation("خانه‌تکانی کش تصویر: {Count} فایل حذف شد", removed);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "خطا در خانه‌تکانی کش تصویر");
+        }
     }
 
     /// <summary>اجرای یک قلم با سقف پیکربندی‌شده؛ صفر/منفی یعنی غیرفعال. شکست فقط لاگ می‌شود.</summary>

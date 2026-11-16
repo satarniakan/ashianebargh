@@ -90,7 +90,9 @@ public class OutboxProcessor : BackgroundService
                         }
                         catch (Exception ex)
                         {
-                            error = ex.Message;
+                            // پیام خطای provider ممکن است شماره/ایمیل را echo کند؛ پیش از
+                            // ذخیره در Outbox (که در صفحهٔ ادمین رندر می‌شود) و لاگ، PII پوشانده می‌شود.
+                            error = PiiMask.FreeText(ex.Message);
                         }
 
                         await outboxRepo.FinishSendingAsync(message.Id, error is null, attempts, _maxAttempts,

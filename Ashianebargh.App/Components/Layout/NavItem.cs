@@ -6,6 +6,7 @@ namespace Ashianebargh.App.Components.Layout;
 /// یک آیتم منو. هر پروژه‌ای ساختار خودش را می‌سازد؛ پایه فقط روی آن حلقه می‌زند.
 /// </summary>
 /// <param name="Title">متن نمایشی آیتم.</param>
+/// <param name="TitleEn">عنوان انگلیسی؛ خالی یعنی همیشه عنوان فارسی نمایش داده شود.</param>
 /// <param name="Href">آدرس نسبی. برای گروه‌های بدون لینک null بگذارید.</param>
 /// <param name="Icon">کلاس آیکون bootstrap-icons، مثلاً <c>bi-house-door</c>.</param>
 /// <param name="RequiredPermission">

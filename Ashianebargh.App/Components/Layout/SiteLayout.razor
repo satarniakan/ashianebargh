@@ -11,7 +11,7 @@
 
 <div class="site-shell" dir="@Language.Dir" lang="@Language.Code" data-lang="@Language.Code">
     <a class="site-skip" href="#site-main">@T("nav.skipToContent")</a>
-    <header class="site-header">
+    <header class="site-header @navStackClass">
         <div class="site-header-inner">
             <a class="site-brand" href="/">
                 <img class="site-brand-mark" src="/logo.png" alt="" width="44" height="44" />
@@ -21,18 +21,25 @@
                 </span>
             </a>
 
-            <nav class="site-nav" aria-label="@T("aria.mainMenu")">
-                <a href="/" class="@NavClass("/")" aria-current="@AriaCurrent("/")">@T("nav.home")</a>
-                <a href="/products" class="@NavClass("/products")" aria-current="@AriaCurrent("/products")">@T("nav.products")</a>
-                @foreach (var item in menu)
-                {
-                    <a href="/@item.Slug" class="@NavClass("/" + item.Slug)" aria-current="@AriaCurrent("/" + item.Slug)">@(Language.IsEnglish ? item.TitleEn : item.Title)</a>
-                }
-                <a href="/about" class="@NavClass("/about")" aria-current="@AriaCurrent("/about")">@T("nav.about")</a>
-                <a href="/contact" class="@NavClass("/contact")" aria-current="@AriaCurrent("/contact")">@T("nav.contact")</a>
-            </nav>
+            @* کلید منوی موبایل: بدون جاوااسکریپت، با selector عمومی چک‌باکس (مثل منوی پنل). *@
+            <input type="checkbox" id="site-nav-toggle" class="site-nav-toggle" aria-label="@T("nav.menu")" />
+            <label class="site-nav-burger" for="site-nav-toggle">
+                <i class="bi bi-list" aria-hidden="true"></i>
+                <span class="visually-hidden">@T("nav.menu")</span>
+            </label>
 
-            <div class="site-actions">
+            <div class="site-menu">
+                <nav class="site-nav" aria-label="@T("aria.mainMenu")">
+                    <a href="/" class="@NavClass("/")" aria-current="@AriaCurrent("/")">@T("nav.home")</a>
+                    <a href="/products" class="@NavClass("/products")" aria-current="@AriaCurrent("/products")">@T("nav.products")</a>
+                    @foreach (var item in menu)
+                    {
+                        <a href="/@item.Slug" class="@NavClass("/" + item.Slug)" aria-current="@AriaCurrent("/" + item.Slug)">@MenuTitle(item)</a>
+                    }
+                    <a href="/about" class="@NavClass("/about")" aria-current="@AriaCurrent("/about")">@T("nav.about")</a>
+                    <a href="/contact" class="@NavClass("/contact")" aria-current="@AriaCurrent("/contact")">@T("nav.contact")</a>
+                </nav>
+
                 <form class="site-search" method="get" action="/products" role="search">
                     <input class="site-search-input" type="search" name="q"
                            placeholder="@Language["search.placeholder"]" aria-label="@Language["search.placeholder"]"
@@ -41,6 +48,9 @@
                         <i class="bi bi-search"></i>
                     </button>
                 </form>
+            </div>
+
+            <div class="site-actions">
                 <div class="site-tools">
                     <a class="site-tool site-tool-lang" href="@LanguageSwitchUrl"
                        data-lang-toggle="@(Language.IsEnglish ? "fa" : "en")"
@@ -101,9 +111,14 @@
             </div>
 
             <div class="site-footer-meta">
-                <a class="site-footer-catalog" href="/media/catalog">
-                    <i class="bi bi-file-earmark-arrow-down"></i>@T("footer.catalog")
-                </a>
+                @if (hasCatalog)
+                {
+                    @* لینک فقط وقتی نمایش داده می‌شود که فایل کاتالوگ واقعاً تنظیم شده باشد؛
+                       وگرنه کاربر با کلیک روی آن ۴۰۴ می‌گیرد. *@
+                    <a class="site-footer-catalog" href="/media/catalog">
+                        <i class="bi bi-file-earmark-arrow-down"></i>@T("footer.catalog")
+                    </a>
+                }
                 <span>© @(Language.IsEnglish
                     ? DateTime.Now.Year.ToString(System.Globalization.CultureInfo.InvariantCulture)
                     : new System.Globalization.PersianCalendar().GetYear(DateTime.Now).ToString("0", System.Globalization.CultureInfo.InvariantCulture)) — @siteName</span>
@@ -117,9 +132,14 @@
     private List<PageMenuItemDto> menu = new();
     private ContactInfoDto? contact;
     private bool isAuthenticated;
+    private bool hasCatalog;
     private string searchTerm = string.Empty;
+    private string navStackClass = string.Empty;
 
     private string T(string key) => Language[key];
+
+    private string MenuTitle(PageMenuItemDto item) =>
+        LocalizedText.Pick(Language.IsEnglish, item.TitleEn, item.Title);
 
     private string LanguageSwitchUrl
     {
@@ -142,12 +162,15 @@
         var contacts = scope.ServiceProvider.GetRequiredService<IContactService>();
 
         siteName = await settings.GetAsync(FrameworkSettingKeys.SiteName) ?? "آشیانه برق";
+        hasCatalog = !string.IsNullOrWhiteSpace(
+            await settings.GetAsync(FrameworkSettingKeys.SiteCatalogFile));
 
         var state = await AuthStateProvider.GetAuthenticationStateAsync();
         isAuthenticated = state.User.Identity?.IsAuthenticated == true;
 
         menu = await pages.GetMenuAsync();
         contact = await contacts.GetInfoAsync();
+        navStackClass = SiteHeaderLayout.IsMenuTooWideForOneRow(NavLabels()) ? "site-header--stacked" : string.Empty;
 
         // عبارت جست‌وجوی جاری از نشانی صفحه خوانده می‌شود تا داخل کادر جست‌وجو بماند.
         Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(Nav.Uri)
@@ -156,6 +179,21 @@
     }
 
     private string NavClass(string path) => IsActive(path) ? "on" : string.Empty;
+
+    /// <summary>برچسب‌های منوی سربرگ به همان ترتیب رندر، برای برآورد جا شدن در یک سطر.</summary>
+    private IEnumerable<string> NavLabels()
+    {
+        yield return T("nav.home");
+        yield return T("nav.products");
+
+        foreach (var item in menu)
+        {
+            yield return MenuTitle(item);
+        }
+
+        yield return T("nav.about");
+        yield return T("nav.contact");
+    }
 
     /// <summary>نشانهٔ صفحهٔ جاری برای صفحه‌خوان‌ها (aria-current).</summary>
     private string AriaCurrent(string path) => IsActive(path) ? "page" : null!;

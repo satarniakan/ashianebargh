@@ -10,3 +10,9 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+
+  # ایمیج‌های پایهٔ Dockerfile (sdk/aspnet) — به‌روزرسانی وصله‌های امنیتی پایه.
+  - package-ecosystem: "docker"
+    directory: "/Ashianebargh.App"
+    schedule:
+      interval: "weekly"

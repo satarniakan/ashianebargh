@@ -12,6 +12,13 @@ public interface IContentRepository
     IQueryable<Tag> Tags { get; }
     IQueryable<Product> Products { get; }
     IQueryable<ProductFile> ProductFiles { get; }
+
+    /// <summary>مشخصات فنی محصول (کلید/مقدار).</summary>
+    IQueryable<ProductSpec> ProductSpecs { get; }
+
+    /// <summary>تصاویر گالری محصول.</summary>
+    IQueryable<ProductImage> ProductImages { get; }
+
     IQueryable<Page> Pages { get; }
     IQueryable<ContactInfo> ContactInfos { get; }
     IQueryable<ContactMessage> ContactMessages { get; }

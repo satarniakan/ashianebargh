@@ -5,19 +5,36 @@ on:
     branches: [ master, main ]
   pull_request:
 
+# حداقل دسترسی توکن: فقط خواندن محتوا. هر job که نیاز بیشتری دارد باید صریحاً اعلام کند.
+# بدون این، توکن پیش‌فرض دسترسی نوشتن دارد و یک action آلوده می‌تواند به ریپو push کند.
+permissions:
+  contents: read
+
 jobs:
   build-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # اکشن‌ها به SHA پین شده‌اند (تگ قابل‌جابه‌جایی است؛ یک تگ آلوده می‌تواند کد تزریق کند).
+      # dependabot (ecosystem: github-actions) این SHAها را به‌روز نگه می‌دارد.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           dotnet-version: '10.0.x'
 
-      - name: Restore
-        run: dotnet restore Ashianebargh.slnx
+      - name: Restore + vulnerable-package gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet restore Ashianebargh.slnx 2>&1 | tee restore.log
+          # NuGetAudit (NuGetAuditMode=all) هنگام restore برای هر بستهٔ آسیب‌پذیر
+          # (حتی گذرا) هشدار NU1901..NU1904 می‌دهد. هر کدام باید بیلد را قرمز کند
+          # تا ارتقای وصله فراموش نشود — این دروازهٔ «بستهٔ آسیب‌پذیر» است.
+          if grep -qE "NU190[1-4]" restore.log; then
+            echo "::error::بستهٔ آسیب‌پذیر شناسایی شد (NU190x). نسخه را ارتقا دهید."
+            exit 1
+          fi
 
       - name: Build
         run: dotnet build Ashianebargh.slnx --no-restore -c Release
@@ -27,21 +44,35 @@ jobs:
 
       - name: Upload coverage
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage
           path: "**/TestResults/**/coverage.cobertura.xml"
           if-no-files-found: warn
+
+  # پویش محرمانه‌های commit‌شده (کلید/رمز/توکن). حتی با .gitignore، یک اشتباه می‌تواند
+  # secret را به تاریخچه ببرد؛ gitleaks آن را پیش از ادغام می‌گیرد.
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # پویش تاریخچهٔ کامل به همهٔ commitها نیاز دارد
+
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # مهم‌ترین تست ریپو: خروجی قالب باید بسازد و سبز باشد. بدون این، قالب می‌تواند
   # بشکند در حالی که build/test خودِ ریپو سبز است.
   template-roundtrip:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           dotnet-version: '10.0.x'
 

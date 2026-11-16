@@ -1,6 +1,8 @@
 ﻿using System.Security.Cryptography;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Ashianebargh.Application.Helpers;
+using Ashianebargh.Application.Validators;
 using Ashianebargh.Domain.Entities;
 using Ashianebargh.Domain.Exceptions;
 using Ashianebargh.Domain.Identity;
@@ -11,8 +13,13 @@ namespace Ashianebargh.Application.Services;
 
 public interface IOtpService
 {
-    Task GenerateAndSendOtpAsync(string phoneNumber);
-    Task<bool> VerifyOtpAsync(string phoneNumber, string code);
+    /// <summary>
+    /// تولید و ارسال کد برای یک هدف مشخص. هدف در هش کد لحاظ می‌شود، پس کدِ
+    /// ورود هرگز برای تعیین رمز (یا برعکس) پذیرفته نمی‌شود.
+    /// </summary>
+    Task GenerateAndSendOtpAsync(string phoneNumber, OtpPurpose purpose = OtpPurpose.Login);
+
+    Task<bool> VerifyOtpAsync(string phoneNumber, string code, OtpPurpose purpose = OtpPurpose.Login);
 
     /// <summary>حذف کدهای منقضی. رکوردهای منقضی هیچ‌وقت خوانده نمی‌شوند (کوئری تأیید
     /// ExpiresAt آینده می‌خواهد) و فقط جدول را پر می‌کنند. بازگشت: تعداد حذف‌شده.</summary>
@@ -29,9 +36,21 @@ public class OtpService : IOtpService
     private readonly ILogger<OtpService> _logger;
     private readonly TimeProvider _clock;
 
+    /// <summary>
+    /// آیا هشِ قدیمیِ «بدون pepper» هم پذیرفته شود؟ پیش‌فرض false.
+    /// <para>
+    /// چرا پیش‌فرض بسته است: فضای کد ۶ رقمی است، پس SHA256(phone:code) بدون
+    /// pepper با یک دیکشنری کوچک آفلاین برگشت‌پذیر می‌شود. پذیرفتن همیشگیِ آن
+    /// مسیر، invariant «فقط هش + pepper» را عملاً بی‌اثر می‌کرد. این کلید فقط
+    /// یک پنجرهٔ گذارِ کوتاه برای چرخش pepper است و باید بعد از آن خاموش شود.
+    /// </para>
+    /// </summary>
+    private readonly bool _allowLegacyUnpepperedHashes;
+
     public OtpService(IOtpRepository otpRepository, IOtpThrottleRepository throttles,
         ISmsSender smsSender, ISettingService settings, IAshianebarghUnitOfWork unitOfWork,
-        ILogger<OtpService> logger, TimeProvider? clock = null)
+        ILogger<OtpService> logger, TimeProvider? clock = null,
+        IConfiguration? configuration = null)
     {
         _otpRepository = otpRepository;
         _throttles = throttles;
@@ -41,6 +60,8 @@ public class OtpService : IOtpService
         _logger = logger;
         // تزریق‌پذیر تا انقضای پنجرهٔ قفل در تست قابل بررسی باشد
         _clock = clock ?? TimeProvider.System;
+        _allowLegacyUnpepperedHashes =
+            configuration?.GetValue<bool>("Security:AllowLegacyUnpepperedHashes") ?? false;
     }
 
     /// <summary>
@@ -110,9 +131,14 @@ public class OtpService : IOtpService
     private Task ClearFailedAttemptsAsync(string phoneNumber) =>
         _throttles.ClearFailedAttemptsAsync(phoneNumber);
 
-    public async Task GenerateAndSendOtpAsync(string phoneNumber)
+    public async Task GenerateAndSendOtpAsync(string phoneNumber, OtpPurpose purpose = OtpPurpose.Login)
     {
-        phoneNumber = PersianSearch.NormalizePhone(phoneNumber);
+        // قالب شماره اینجا بررسی می‌شود نه فقط در فرم: هم API و هم circuit به همین سرویس
+        // می‌رسند و شمارهٔ بی‌قالب/بلند نباید به سرویس پیامک یا ستون nvarchar(32) برسد.
+        var validPhone = AuthInput.NormalizeValidPhone(phoneNumber);
+        if (validPhone is null)
+            throw new BusinessRuleException("شماره موبایل معتبر نیست.");
+        phoneNumber = validPhone;
 
         // شماره‌ای که چند بار پشت‌سرهم کد اشتباه داده، فعلاً ورودی جدید نمی‌گیرد
         // تا مهاجم نتواند با درخواست‌های مکرر، کدهای معتبر کاربر را باطل کند
@@ -142,8 +168,9 @@ public class OtpService : IOtpService
         var otp = new OtpCode
         {
             PhoneNumber = phoneNumber,
+            Purpose = purpose,
             // فقط هش کد ذخیره می‌شود نه خود کد — دسترسی مستقیم به دیتابیس دیگر امکان ورود نمی‌دهد
-            Code = await HashOtpAsync(phoneNumber, code),
+            Code = await HashOtpAsync(phoneNumber, code, purpose),
             ExpiresAt = _clock.GetUtcNow().UtcDateTime.AddMinutes(5),
             IsUsed = false
         };
@@ -161,19 +188,28 @@ public class OtpService : IOtpService
         // کد قبلی هنوز معتبر است و کاربر نه با کدی بی‌اعتبار و نه بدون کد می‌ماند
         await _smsSender.SendAsync(phoneNumber, body);
 
-        // فقط پس از ارسال موفق — تا آخرین کد ارسال‌شده قابل استفاده بماند
+        // فقط پس از ارسال موفق — تا آخرین کد ارسال‌شده قابل استفاده بماند.
+        // هدف جداگانه فیلتر می‌شود تا کدِ تعیین رمز، کدِ ورودِ در جریان را باطل نکند.
         await _otpRepository.InvalidateOthersAsync(
-            phoneNumber, otp.Id, _clock.GetUtcNow().UtcDateTime);
+            phoneNumber, purpose, otp.Id, _clock.GetUtcNow().UtcDateTime);
         await _unitOfWork.CompleteAsync();
 
         _logger.LogInformation("OTP generated for {PhoneNumber}", PiiMask.Phone(phoneNumber));
     }
 
-    public async Task<bool> VerifyOtpAsync(string phoneNumber, string code)
+    public async Task<bool> VerifyOtpAsync(
+        string phoneNumber, string code, OtpPurpose purpose = OtpPurpose.Login)
     {
         // نرمال‌سازی اینجا (نه فقط در فراخواننده): هش هنگام ساخت با شمارهٔ نرمال‌شده
         // ساخته شده و مسیر API هم بدون آن کد معتبر را رد می‌کرد.
-        phoneNumber = PersianSearch.NormalizePhone(phoneNumber);
+        // ورودی بی‌قالب پیش از هر کوئری/نوشتن رد می‌شود؛ این «اعتبارسنجی ورودی» است نه
+        // «تلاش ناموفق»، پس شمارندهٔ قفل شماره را هم جلو نمی‌برد (وگرنه درخواست‌های
+        // آشغالِ یک مهاجم، شمارهٔ قربانی را قفل می‌کرد).
+        var validPhone = AuthInput.NormalizeValidPhone(phoneNumber);
+        if (validPhone is null || !AuthInput.IsValidOtpCode(code))
+            return false;
+        phoneNumber = validPhone;
+        code = code.Trim();
 
         if (await IsBlockedAsync(phoneNumber))
         {
@@ -183,14 +219,21 @@ public class OtpService : IOtpService
         }
 
         // همان هشِ لحظهٔ ساخت اعمال می‌شود تا بدون ذخیرهٔ کد خام در دیتابیس، کد پیدا شود.
-        // رکوردهای قدیمیِ «بدون pepper» هم پذیرفته می‌شوند تا چرخش pepper ورود جاری را
-        // نشکند — ولی فقط وقتی pepper واقعاً تنظیم است (وگرنه همان کوئری اول کافی است و
-        // نباید به‌ازای هر تلاش ناموفق دو کوئری به دیتابیس بزنیم).
+        // هدف هم در هش و هم در کوئری هست، پس کدِ ورود برای تعیین رمز پذیرفته نمی‌شود.
         var now = _clock.GetUtcNow().UtcDateTime;
-        var peppered = await HashOtpAsync(phoneNumber, code);
-        var otp = await _otpRepository.GetLatestValidAsync(phoneNumber, peppered, now);
-        if (otp is null && !string.Equals(peppered, HashOtp(phoneNumber, code, pepper: null), StringComparison.Ordinal))
-            otp = await _otpRepository.GetLatestValidAsync(phoneNumber, HashOtp(phoneNumber, code, pepper: null), now);
+        var peppered = await HashOtpAsync(phoneNumber, code, purpose);
+        var otp = await _otpRepository.GetLatestValidAsync(phoneNumber, peppered, purpose, now);
+
+        // مسیر گذارِ «هش بدون pepper» فقط با کلید صریح Security:AllowLegacyUnpepperedHashes
+        // باز می‌شود. پیش‌فرض بسته است: فضای کد ۶ رقمی است و SHA256(phone:code) بدون
+        // pepper آفلاین برگشت‌پذیر می‌شود، پس پذیرفتن همیشگی‌اش invariant
+        // «فقط هش + pepper» را بی‌اثر می‌کرد. بعد از چرخش pepper باید خاموش شود.
+        if (otp is null && _allowLegacyUnpepperedHashes)
+        {
+            var legacy = HashOtp(phoneNumber, code, purpose, pepper: null);
+            if (!string.Equals(peppered, legacy, StringComparison.Ordinal))
+                otp = await _otpRepository.GetLatestValidAsync(phoneNumber, legacy, purpose, now);
+        }
 
         if (otp is null)
         {
@@ -224,25 +267,32 @@ public class OtpService : IOtpService
 
     /// <summary>
     /// هش کد یک‌بارمصرف — کد خام هرگز در دیتابیس ذخیره نمی‌شود.
-    /// شمارهٔ موبایل در هش لحاظ می‌شود تا هش یک کد رایج (مثل ۱۲۳۴۵۶) برای همه یکسان نباشد؛
+    /// شمارهٔ موبایل و هدف در هش لحاظ می‌شوند تا هش یک کد رایج (مثل ۱۲۳۴۵۶) برای
+    /// همه یکسان نباشد و کدِ یک مسیر در مسیر دیگر پذیرفته نشود؛
     /// یادآوری: فضای کد ۶ رقمی است، پس محافظت اصلی در برابر حدس، محدودیت نرخ درخواست‌هاست.
     /// pepper سمت سرور (Security:Pepper) هم لحاظ می‌شود تا لو رفتن دیتابیس به‌تنهایی
-    /// برای brute-force کافی نباشد؛ خالی یعنی رفتار قدیمی (سازگاری).
+    /// برای brute-force کافی نباشد.
     /// </summary>
-    private async Task<string> HashOtpAsync(string phoneNumber, string code)
+    private async Task<string> HashOtpAsync(string phoneNumber, string code, OtpPurpose purpose)
     {
         var pepper = await _settings.GetEffectiveAsync(
             IntegrationSettingKeys.SecurityPepper, "Security:Pepper");
-        return HashOtp(phoneNumber, code, string.IsNullOrWhiteSpace(pepper) ? null : pepper);
+        return HashOtp(phoneNumber, code, purpose, string.IsNullOrWhiteSpace(pepper) ? null : pepper);
     }
 
-    internal static string HashOtp(string phoneNumber, string code, string? pepper = null)
+    /// <summary>
+    /// هدف به‌صورت عددی در ورودی هش می‌آید (نه نام enum) تا با تغییر نام اعضا
+    /// هش‌های موجود بی‌اعتبار نشوند. افزودن هدف یعنی کدهای در جریانِ پیش از
+    /// استقرار دیگر تأیید نمی‌شوند؛ عمرشان ۵ دقیقه است و کاربر کد تازه می‌گیرد.
+    /// </summary>
+    internal static string HashOtp(
+        string phoneNumber, string code, OtpPurpose purpose, string? pepper = null)
     {
-        // پیش‌فرض null یعنی «بدون pepper» تا فراخوانی قدیمیِ دوآرگومانی (تست‌ها)
-        // دقیقاً رفتار قبلی را بدهد؛ رشتهٔ خالی هم مثل null (بدون pepper) است.
+        // پیش‌فرض null یعنی «بدون pepper» و فقط برای مسیر گذارِ صریح‌کلیددار؛
+        // رشتهٔ خالی هم مثل null (بدون pepper) است.
         var input = string.IsNullOrEmpty(pepper)
-            ? $"{phoneNumber}:{code}"
-            : $"{phoneNumber}:{code}:{pepper}";
+            ? $"{phoneNumber}:{(int)purpose}:{code}"
+            : $"{phoneNumber}:{(int)purpose}:{code}:{pepper}";
         return Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(input)));
     }
 }

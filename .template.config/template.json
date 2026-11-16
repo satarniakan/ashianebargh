@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Ashianebargh",
+  "classifications": [ "Web", "Blazor", "Blazor Server", "RTL", "Persian", "Framework" ],
+  "identity": "Ashianebargh.EmptyFramework",
+  "groupIdentity": "Ashianebargh.EmptyFramework",
+  "name": "Ashianebargh Empty Framework (Blazor Server, RTL)",
+  "shortName": "empty-ashianebargh",
+  "description": "قالب خالی فارسی راست‌چین روی Blazor Server: لایه‌های Domain/Application/Infrastructure/App، احراز هویت OTP/رمز، مجوزهای پویا، آپلود امن و سایت عمومی. دامنهٔ خود را از نقاط توسعه وصل کنید.",
+  "sourceName": "Ashianebargh",
+  "preferNameDirectory": true,
+  "defaultName": "MyProject",
+  "tags": {
+    "language": "C#",
+    "type": "solution"
+  },
+  "sources": [
+    {
+      "modifiers": [
+        {
+          "exclude": [
+            ".git/**",
+            ".vs/**",
+            ".idea/**",
+            ".artifacts/**",
+            "artifacts/**",
+            "**/bin/**",
+            "**/obj/**",
+            "**/TestResults/**",
+            "**/node_modules/**",
+            "**/AppData/**",
+            "**/Logs/**",
+            "**/DataProtection-Keys/**",
+            "**/appsettings.json",
+            "**/appsettings.Development.json",
+            "**/appsettings.*.Local.json",
+            "**/appsettings.Development.local.json",
+            "**/secrets.json",
+            "**/.env",
+            "**/*.user",
+            "**/*.suo",
+            "**/*.log",
+            "**/*.trx",
+            ".template.config/**"
+          ]
+        }
+      ]
+    }
+  ]
+}

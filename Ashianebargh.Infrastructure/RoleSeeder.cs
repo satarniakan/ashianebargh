@@ -46,12 +46,24 @@ public static class RoleSeeder
                     $"افزودن مجوز «{permission}» به نقش ادمین ناموفق بود: {string.Join("; ", addResult.Errors.Select(e => e.Description))}");
         }
 
+        var removedStalePermission = false;
         foreach (var staleClaim in existingPermissions.Where(c => !knownPermissions.Contains(c.Value)))
         {
             var removeResult = await roleManager.RemoveClaimAsync(adminRole, staleClaim);
             if (!removeResult.Succeeded)
                 throw new InvalidOperationException(
                     $"حذف مجوز قدیمی «{staleClaim.Value}» از نقش ادمین ناموفق بود: {string.Join("; ", removeResult.Errors.Select(e => e.Description))}");
+            removedStalePermission = true;
+        }
+
+        // مجوزها در کوکیِ نشست‌های زنده پخته شده‌اند؛ اگر کلیدی از کاتالوگ حذف شد،
+        // ادمینِ واردشده همچنان آن را دارد. فقط در همان حالتِ نادر stamp عوض می‌شود
+        // تا هر استقرارِ عادی همه را بیرون نیندازد.
+        if (removedStalePermission)
+        {
+            var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            foreach (var admin in await userManager.GetUsersInRoleAsync(Roles.Admin))
+                await userManager.UpdateSecurityStampAsync(admin);
         }
     }
 }

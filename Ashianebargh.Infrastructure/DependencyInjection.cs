@@ -33,25 +33,9 @@ public static class DependencyInjection
         // وارد شود تا آن‌ها را از صفحهٔ تنظیمات پر کند — بن‌بست چرخه‌ای.
         // مقادیر باید از env/appsettings برسند؛ چرخش بعدی از صفحهٔ تنظیمات (ردیف دیتابیس)
         // مجاز است به شرطی که env همچنان یک مقدار معتبر نگه دارد.
+        // جزئیات هر گارد در ProductionGuards است تا مستقل از DI تست‌پذیر بماند.
         if (!isDevelopment)
-        {
-            if (!string.Equals(configuration["Captcha:Provider"], "Turnstile", StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException(
-                    "Captcha:Provider باید در Production روی «Turnstile» تنظیم شود؛ در غیر این صورت " +
-                    "درخواست‌های OTP بدون کپچا پذیرفته می‌شوند. برای اجرای محلی از محیط Development استفاده کنید.");
-
-            if (string.IsNullOrWhiteSpace(configuration["Captcha:Turnstile:SecretKey"]) ||
-                string.IsNullOrWhiteSpace(configuration["Captcha:Turnstile:SiteKey"]))
-                throw new InvalidOperationException(
-                    "کلیدهای Turnstile (Captcha:Turnstile:SecretKey و SiteKey) باید در Production از " +
-                    "env/appsettings موجود باشند؛ با کلید خالی اعتبارسنج fail-closed است و هیچ ورودی " +
-                    "(حتی ادمین اول) ممکن نیست.");
-
-            if (string.IsNullOrWhiteSpace(configuration["Security:Pepper"]))
-                throw new InvalidOperationException(
-                    "Security:Pepper باید در Production تنظیم شود؛ با pepper خالی هش OTP/توکن به " +
-                    "SHA-256 ساده برمی‌گردد و لو رفتن دیتابیس به‌تنهایی برای brute-force کافی است.");
-        }
+            ProductionGuards.ValidateAll(configuration);
 
         services.AddDbContext<AshianebarghDbContext>(opt =>
         {
@@ -111,14 +95,26 @@ public static class DependencyInjection
             // - SecurePolicy در Development همان SameAsRequest می‌ماند تا لاگین روی
             //   http://localhost هم کار کند؛ در Production همیشه Always (کوکی فقط روی HTTPS).
             // - SameSite=Lax: تعادل CSRF و ناوبری عادی.
-            // - انقضای ۸ ساعته با تمدید لغزان به‌جای ۱۴ روز پیش‌فرض Identity.
+            // - انقضای مطلق ۸ ساعته: با SlidingExpiration=false نشستِ فعال هم پس از ۸ ساعت
+            //   تمام می‌شود. تمدید لغزان یعنی کوکیِ دزدیده‌شده تا وقتی مهاجم فعال است زنده
+            //   می‌ماند و هیچ سقفی برای عمر نشست وجود ندارد. هزینه‌اش ورود دوبارهٔ کاربر
+            //   پس از ۸ ساعت است؛ اگر تجربهٔ کاربری مهم‌تر بود، این را true کنید.
             options.Cookie.SecurePolicy = isDevelopment
                 ? CookieSecurePolicy.SameAsRequest
                 : CookieSecurePolicy.Always;
             options.Cookie.SameSite = SameSiteMode.Lax;
             options.Cookie.HttpOnly = true;
             options.ExpireTimeSpan = TimeSpan.FromHours(8);
-            options.SlidingExpiration = true;
+            options.SlidingExpiration = false;
+        });
+
+        // نقش‌ها/مجوزها در کوکی پخته می‌شوند، پس تغییرشان باید نشست زنده را باطل کند.
+        // UserAdminService و PermissionService هنگام تغییر، security stamp را عوض می‌کنند؛
+        // این بازه تعیین می‌کند کوکیِ موجود حداکثر چه مدتی بعد متوجهٔ آن تغییر شود.
+        // پیش‌فرض Identity سی دقیقه است — برای «عزل دسترسی» خیلی کند.
+        services.Configure<SecurityStampValidatorOptions>(options =>
+        {
+            options.ValidationInterval = TimeSpan.FromMinutes(5);
         });
 
         services.AddScoped<IAshianebarghUnitOfWork, AshianebarghUnitOfWork>();

@@ -66,7 +66,10 @@ public class WebHostingTests : IAsyncLifetime
         _app.UseAntiforgery();
         _app.UseRateLimiter();
         _app.MapAshianebargh();
-        _app.MapGet("/ping", () => Results.Text("pong"));
+        //.ping عمداً عمومی است؛ با سیاست fallback سراسری باید صراحتاً AllowAnonymous شود.
+        _app.MapGet("/ping", () => Results.Text("pong")).AllowAnonymous();
+        // بدون هیچ متادیتای مجوزدهی: سیاست fallback باید آن را محافظت کند.
+        _app.MapGet("/unmarked", () => Results.Text("secret"));
 
         await _app.StartAsync();
         _client = _app.GetTestClient();
@@ -99,6 +102,25 @@ public class WebHostingTests : IAsyncLifetime
         Assert.Equal("nosniff", GetHeader(response, "X-Content-Type-Options"));
         Assert.Equal("SAMEORIGIN", GetHeader(response, "X-Frame-Options"));
         Assert.Equal("strict-origin-when-cross-origin", GetHeader(response, "Referrer-Policy"));
+        Assert.Equal("same-origin", GetHeader(response, "Cross-Origin-Opener-Policy"));
+        Assert.Equal("same-origin", GetHeader(response, "Cross-Origin-Resource-Policy"));
+        Assert.Equal("unsafe-none", GetHeader(response, "Cross-Origin-Embedder-Policy"));
+        Assert.Contains("camera=()", GetHeader(response, "Permissions-Policy"));
+    }
+
+    [Fact]
+    public async Task ContentSecurityPolicy_DropsUnsafeEval_AndScopesImageAndConnect()
+    {
+        // رگرسیون سخت‌سازی CSP: eval حذف، img/connect محدود به خودِ سرور.
+        var response = await _client.GetAsync("/ping");
+        var csp = GetHeader(response, "Content-Security-Policy");
+
+        Assert.NotNull(csp);
+        Assert.DoesNotContain("unsafe-eval", csp);
+        Assert.Contains("img-src 'self' data: blob:;", csp);
+        Assert.Contains("connect-src 'self' https://challenges.cloudflare.com;", csp);
+        Assert.Contains("object-src 'none'", csp);
+        Assert.Contains("frame-ancestors 'self'", csp);
     }
 
     private static string? GetHeader(HttpResponseMessage response, string name) =>
@@ -118,6 +140,27 @@ public class WebHostingTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Found, response.StatusCode);
         Assert.NotNull(response.Headers.Location);
         Assert.Equal("/login", response.Headers.Location!.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task UnmarkedEndpoint_RequiresAuth_UnderFallbackPolicy()
+    {
+        // رگرسیون deny-by-default: مسیرِ بدون متادیتای مجوزدهی باید ورود بخواهد،
+        // نه اینکه تصادفاً عمومی بماند.
+        var response = await _client.GetAsync("/unmarked");
+
+        Assert.Equal(HttpStatusCode.Found, response.StatusCode);
+        Assert.Equal("/login", response.Headers.Location!.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task ExplicitlyAnonymousEndpoint_StaysPublic_UnderFallbackPolicy()
+    {
+        // مسیرِ AllowAnonymous باید با وجود fallback همچنان عمومی بماند.
+        var response = await _client.GetAsync("/ping");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("pong", await response.Content.ReadAsStringAsync());
     }
 
     [Fact]

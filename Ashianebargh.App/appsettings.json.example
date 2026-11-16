@@ -3,6 +3,7 @@
 
   "//": "این فایل را به appsettings.json کپی کنید و مقادیر واقعی را بگذارید. خودِ appsettings.json عمداً در git نیست.",
   "//settings": "مقادیر عملیاتی (کلیدها، هاست‌ها) را می‌توانید به‌جای این فایل از صفحه /admin/settings هم عوض کنید — ردیف دیتابیس بر این فایل مقدم است. مقادیر محرمانه در دیتابیس رمزنگاری می‌شوند.",
+  "//serilog-log-note": "سطح System را از Warning پایین نیاورید: کلید API کاوه‌نگار داخل URL درخواست است و لاگ HttpClient آن را با آدرس کامل ثبت می‌کند.",
 
   "ConnectionStrings": {
     "Default": "Server=(localdb)\\mssqllocaldb;Database=EmptyFrameworkDev;Trusted_Connection=True;TrustServerCertificate=True",
@@ -13,7 +14,6 @@
     "AutoMigrate": true
   },
   "Serilog": {
-    "//log-note": "سطح System را از Warning پایین نیاورید: کلید API کاوه‌نگار داخل URL درخواست است و لاگ HttpClient آن را با آدرس کامل ثبت می‌کند.",
     "MinimumLevel": {
       "Default": "Information",
       "Override": {
@@ -78,7 +78,9 @@
     "NotificationDays": 90,
     "ApiTokenDays": 90,
     "AuditLogDays": 730,
-    "OutboxDays": 90
+    "OutboxDays": 90,
+    "//ImageVariantDays": "مهلت نگه‌داری نسخه‌های کوچک‌شدهٔ تصویر که تصویر مبدأشان دیگر عمومی نیست (روز).",
+    "ImageVariantDays": 30
   },
   "Security": {
     "//Pepper": "نمک سمت سرور برای هش OTP و توکن. مقدار واقعی را در Secret Manager یا env بگذارید (Security:Pepper)؛ خالی یعنی رفتار قدیمی.",

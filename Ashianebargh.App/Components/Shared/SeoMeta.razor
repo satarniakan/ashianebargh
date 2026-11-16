@@ -1,0 +1,73 @@
+@* متاتگ‌های سئو و اشتراک‌گذاری برای صفحات عمومی سایت.
+   خروجی در <HeadOutlet> صفحهٔ App تزریق می‌شود. *@
+@using Microsoft.AspNetCore.Components.Web
+@using Ashianebargh.App.Services
+@inject NavigationManager Nav
+@inject SiteLanguage Language
+
+<HeadContent>
+    <meta name="description" content="@Description" />
+    <link rel="canonical" href="@CanonicalUrl" />
+
+    <meta property="og:site_name" content="@SiteName" />
+    <meta property="og:type" content="@Type" />
+    <meta property="og:title" content="@Title" />
+    <meta property="og:description" content="@Description" />
+    <meta property="og:url" content="@CanonicalUrl" />
+    <meta property="og:locale" content="@(Language.IsEnglish ? "en_US" : "fa_IR")" />
+
+    @if (!string.IsNullOrWhiteSpace(ImageUrl))
+    {
+        <meta property="og:image" content="@ImageUrl" />
+    }
+
+    <meta name="twitter:card" content="@(string.IsNullOrWhiteSpace(ImageUrl) ? "summary" : "summary_large_image")" />
+    <meta name="twitter:title" content="@Title" />
+    <meta name="twitter:description" content="@Description" />
+
+    @if (JsonLd is not null)
+    {
+        @foreach (var block in JsonLd)
+        {
+            @* JSON-LD را همان سازندهٔ امن (JsonSerializer) می‌سازد؛ کاراکترهای HTML هم escape شده‌اند. *@
+            <script type="application/ld+json">@((MarkupString)block)</script>
+        }
+    }
+</HeadContent>
+
+@code {
+    /// <summary>عنوان صفحه؛ همان چیزی که در og:title می‌نشیند.</summary>
+    [Parameter] public string Title { get; set; } = string.Empty;
+
+    /// <summary>توضیح متا — حداکثر ~۱۶۰ کاراکتر برای نمایش در نتایج جست‌وجو.</summary>
+    [Parameter] public string Description { get; set; } = string.Empty;
+
+    /// <summary>مسیر نسبی برای canonical؛ خالی یعنی مسیر جاریِ بدون query.</summary>
+    [Parameter] public string? Path { get; set; }
+
+    /// <summary>نشانی مطلق تصویر اشتراک‌گذاری (og:image).</summary>
+    [Parameter] public string? ImageUrl { get; set; }
+
+    /// <summary>نوع og: مثلاً website یا product.</summary>
+    [Parameter] public string Type { get; set; } = "website";
+
+    /// <summary>بلوک‌های JSON-LD آماده (اختیاری)؛ هر بلوک یک تگ script جدا می‌شود.</summary>
+    [Parameter] public IReadOnlyList<string>? JsonLd { get; set; }
+
+    /// <summary>نام سایت برای og:site_name.</summary>
+    [Parameter] public string SiteName { get; set; } = "آشیانه برق";
+
+    private string CanonicalUrl
+    {
+        get
+        {
+            var absolute = Nav.ToAbsoluteUri(Nav.Uri);
+            // فیلترها و پارامترهای جست‌وجو نباید canonical را تکه‌تکه کنند؛
+            // نسخهٔ اصلی هر صفحه همان مسیر بدون query است.
+            var path = string.IsNullOrWhiteSpace(Path)
+                ? absolute.GetLeftPart(UriPartial.Path)
+                : new Uri(absolute, Path).GetLeftPart(UriPartial.Path);
+            return path;
+        }
+    }
+}

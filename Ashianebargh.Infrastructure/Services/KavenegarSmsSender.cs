@@ -46,16 +46,31 @@ public class KavenegarSmsSender : ISmsSender
         if (!string.IsNullOrWhiteSpace(sender))
             payload["sender"] = sender;
 
-        var response = await _http.PostAsync(
-            $"https://api.kavenegar.com/v1/{apiKey}/sms/send.json",
-            new FormUrlEncodedContent(payload));
+        // کلید API طبق طراحی REST کاوه‌نگار داخل مسیر URL است و نمی‌توان آن را به هدر برد.
+        // پس دو لایه محافظت داریم: (۱) سطح لاگ System/Microsoft=Warning در production تا
+        // لاگِ HttpClient آدرس کامل را ثبت نکند؛ (۲) همین try/catch که پیام خام استثنا
+        // (که ممکن است URL/کلید را داشته باشد) هرگز به لاگ یا Outbox نرسد.
+        var url = $"https://api.kavenegar.com/v1/{apiKey}/sms/send.json";
+        KavenegarResponse? body;
+        HttpResponseMessage response;
+        try
+        {
+            response = await _http.PostAsync(url, new FormUrlEncodedContent(payload));
+            body = await response.Content.ReadFromJsonAsync<KavenegarResponse>();
+        }
+        catch (Exception ex)
+        {
+            // فقط نوع خطا لاگ می‌شود، نه Message/URL؛ کلید داخل URL است.
+            _logger.LogWarning("ارسال پیامک کاوه‌نگار با خطای شبکه/سرویس مواجه شد: {ErrorType}", ex.GetType().Name);
+            throw new InvalidOperationException("ارسال پیامک ناموفق بود (خطای شبکه/سرویس).");
+        }
 
-        var body = await response.Content.ReadFromJsonAsync<KavenegarResponse>();
         if (body?.Return?.Status == 200)
             return;
 
-        _logger.LogWarning("ارسال پیامک کاوه‌نگار ناموفق: {Error}", body?.Return?.Message ?? response.StatusCode.ToString());
-        throw new InvalidOperationException($"ارسال پیامک ناموفق: {body?.Return?.Message ?? response.StatusCode.ToString()}");
+        var error = body?.Return?.Message ?? response.StatusCode.ToString();
+        _logger.LogWarning("ارسال پیامک کاوه‌نگار ناموفق: {Error}", error);
+        throw new InvalidOperationException($"ارسال پیامک ناموفق: {error}");
     }
 
     private sealed class KavenegarResponse

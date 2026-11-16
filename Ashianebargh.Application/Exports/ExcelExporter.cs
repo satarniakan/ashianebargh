@@ -22,9 +22,11 @@ public class ExcelExporter : IExcelExporter
         var sheet = workbook.Worksheets.Add(SanitizeSheetName(sheetName));
 
         // شیت ۱: فقط داده‌ها (همان چیزی که کاربر فیلتر کرده)
+        // عنوان ستون‌ها با SetValue نوشته می‌شود نه .Value؛ چون .Value در ClosedXML
+        // رشتهٔ شروع‌شده با «=» را فرمول می‌کند ولی SetValue همیشه متنِ literal است.
         var headerRow = sheet.Row(1);
         for (var c = 0; c < table.Columns.Count; c++)
-            headerRow.Cell(c + 1).Value = table.Columns[c].Title;
+            headerRow.Cell(c + 1).SetValue(NeutralizeFormula(table.Columns[c].Title));
 
         for (var r = 0; r < table.Rows.Count; r++)
         {
@@ -36,16 +38,16 @@ public class ExcelExporter : IExcelExporter
 
         // شیت ۲: شرایط فیلتر — تا معلوم باشد این گزارش با چه فیلتری گرفته شده
         var meta = workbook.Worksheets.Add("شرایط گزارش");
-        meta.Cell(1, 1).Value = "پارامتر";
-        meta.Cell(1, 2).Value = "مقدار";
-        meta.Cell(2, 1).Value = "تعداد کل رکورد";
+        meta.Cell(1, 1).SetValue("پارامتر");
+        meta.Cell(1, 2).SetValue("مقدار");
+        meta.Cell(2, 1).SetValue("تعداد کل رکورد");
         meta.Cell(2, 2).Value = table.TotalCount ?? table.Rows.Count;
         if (table.Truncated)
         {
-            meta.Cell(3, 1).Value = "توجه";
-            meta.Cell(3, 2).Value =
+            meta.Cell(3, 1).SetValue("توجه");
+            meta.Cell(3, 2).SetValue(
                 $"گزارش {table.TotalCount} ردیف دارد؛ فایل شامل {table.Rows.Count} ردیف است. " +
-                "برای گرفتن بقیه، فیلتر بازه را باریک‌تر کنید.";
+                "برای گرفتن بقیه، فیلتر بازه را باریک‌تر کنید.");
         }
 
         sheet.Row(1).Style.Font.Bold = true;
@@ -72,7 +74,7 @@ public class ExcelExporter : IExcelExporter
                     // ارقام جداکننده و قالب پول برای خواندن بهتر
                     cell.Style.NumberFormat.Format = kind == ReportColumnKind.Money ? "#,##0" : "#,##0.##";
                 }
-                else cell.SetValue(value?.ToString() ?? string.Empty);
+                else cell.SetValue(NeutralizeFormula(value?.ToString() ?? string.Empty));
                 break;
 
             case ReportColumnKind.Integer:
@@ -81,7 +83,7 @@ public class ExcelExporter : IExcelExporter
                     cell.Value = l;
                     cell.Style.NumberFormat.Format = "#,##0";
                 }
-                else cell.SetValue(value?.ToString() ?? string.Empty);
+                else cell.SetValue(NeutralizeFormula(value?.ToString() ?? string.Empty));
                 break;
 
             case ReportColumnKind.Date:
@@ -90,14 +92,27 @@ public class ExcelExporter : IExcelExporter
                          && DateTime.TryParse(value.ToString(), CultureInfo.InvariantCulture,
                              DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var parsed))
                     cell.Value = parsed;
-                else cell.SetValue(value?.ToString() ?? string.Empty);
+                else cell.SetValue(NeutralizeFormula(value?.ToString() ?? string.Empty));
                 cell.Style.DateFormat.Format = "yyyy-MM-dd";
                 break;
 
             default:
-                cell.SetValue(value?.ToString() ?? string.Empty);
+                cell.SetValue(NeutralizeFormula(value?.ToString() ?? string.Empty));
                 break;
         }
+    }
+
+    /// <summary>
+    /// خنثی‌سازی تزریق فرمول: متنِ شروع‌شده با = + - @ یا tab/CR یک آپاستروف پیشوند
+    /// می‌گیرد تا هنگام باز شدن در اکسل یا بازصادرات به CSV به فرمول تبدیل نشود.
+    /// خودِ SetValue در ClosedXML متن را literal می‌گذارد؛ این لایهٔ اضافه دفاع در
+    /// عمق برای CSV و نسخه‌های دیگر است. ستون‌های عددی/تاریخ typed هستند و نمی‌رسند.
+    /// </summary>
+    private static string NeutralizeFormula(string value)
+    {
+        if (string.IsNullOrEmpty(value)) return value;
+        var first = value[0];
+        return first is '=' or '+' or '-' or '@' or '\t' or '\r' ? "'" + value : value;
     }
 
     /// <summary>نام شیت اکسل حداکثر ۳۱ کاراکتر و بدون این نویسه‌ها می‌تواند باشد</summary>

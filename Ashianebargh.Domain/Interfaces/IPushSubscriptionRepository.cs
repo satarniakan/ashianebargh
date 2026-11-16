@@ -33,7 +33,9 @@ public interface IPushSender
 
 /// <summary>اشتراک مرورگر دیگر معتبر نیست (410 Gone / 404) — رکوردش باید حذف شود.</summary>
 public sealed class PushSubscriptionExpiredException(string endpoint)
-    : Exception($"Push subscription expired: {endpoint}")
+    : Exception("Push subscription expired.")
 {
+    // پیام عمداً بدون endpoint است؛ خودِ endpoint یک capability URL یکتاست و اگر
+    // پیام خطا جایی لاگ/نمایش داده شود نباید شناسهٔ دستگاه کاربر درز کند.
     public string Endpoint { get; } = endpoint;
 }

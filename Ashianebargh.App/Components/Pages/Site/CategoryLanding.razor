@@ -1,0 +1,134 @@
+@page "/category/{Slug}"
+@attribute [AllowAnonymous]
+@layout SiteLayout
+@using Microsoft.AspNetCore.Http
+@using Ashianebargh.Application.Content
+@using Ashianebargh.Application.DTOs
+@using Ashianebargh.App.Services
+@inject ICategoryService CategoryService
+@inject IProductService ProductService
+@inject SiteLanguage Language
+
+@if (category is null)
+{
+    <PageTitle>@Language["notFound.title"]</PageTitle>
+    <NotFoundContent From="@("/category/" + Slug)" />
+}
+else
+{
+    <PageTitle>@category.Name | آشیانه برق</PageTitle>
+    <SeoMeta Title="@category.Name" Description="@SeoDescription" Path="@("/category/" + category.Slug)" />
+
+    <div class="site-container">
+        <div class="site-page-head">
+            <nav class="site-breadcrumb" aria-label="@Language["aria.breadcrumb"]">
+                <a href="/">@Language["common.home"]</a>
+                <span class="sep">/</span>
+                <a href="/products">@Language["nav.products"]</a>
+                <span class="sep">/</span>
+                <span class="current">@category.Name</span>
+            </nav>
+            <h1>@category.Name</h1>
+            <p>@SeoDescription</p>
+        </div>
+
+        <div class="site-catalog">
+            <aside class="site-side">
+                <div class="site-side-head"><h2>@Language["side.categories"]</h2></div>
+                <nav class="site-side-nav" aria-label="@Language["aria.categories"]">
+                    <a href="/products">
+                        <span class="site-side-icon"><i class="bi bi-grid-3x3-gap"></i></span>
+                        <span class="site-side-name">@Language["common.allProducts"]</span>
+                    </a>
+                    @foreach (var item in categories)
+                    {
+                        <a class="@(item.Slug == category.Slug ? "on" : "")" href="/category/@item.Slug">
+                            <span class="site-side-icon"><i class="bi bi-diagram-3"></i></span>
+                            <span class="site-side-name">@item.Name</span>
+                            <span class="site-side-count">@item.ProductCount</span>
+                        </a>
+                    }
+                </nav>
+            </aside>
+
+            <section class="site-catalog-main">
+                @if (result is null || !result.Items.Any())
+                {
+                    <div class="site-empty">
+                        <i class="bi bi-box-seam"></i>
+                        <p>@Language["category.empty"]</p>
+                        <a href="/products" class="btn btn-sm btn-outline-secondary">@Language["products.clear"]</a>
+                    </div>
+                }
+                else
+                {
+                    <div class="site-catalog-bar">
+                        <span class="site-result-count">@Language.ProductCount(result.TotalCount)</span>
+                        <SiteSortBar SortKey="SortKey" UrlFor="key => ListUrl(key, 1)" />
+                    </div>
+
+                    <div class="site-grid">
+                        @foreach (var product in result.Items)
+                        {
+                            <ProductCardView Product="product" />
+                        }
+                    </div>
+
+                    @if (result.TotalPages > 1)
+                    {
+                        <SitePager Page="result.Page" TotalPages="result.TotalPages"
+                                   UrlFor="page => ListUrl(SortKey, page)" />
+                    }
+                }
+            </section>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string Slug { get; set; } = string.Empty;
+    [SupplyParameterFromQuery(Name = "page")] public int PageNumber { get; set; } = 1;
+    [SupplyParameterFromQuery(Name = "sort")] public string? Sort { get; set; }
+
+    private static readonly string[] ValidSorts = ["", "newest", "price-asc", "price-desc"];
+
+    private CategoryListItemDto? category;
+    private List<CategoryListItemDto> categories = new();
+    private PagedResult<ProductCardDto>? result;
+
+    private string SortKey =>
+        ValidSorts.Contains(Sort ?? string.Empty, StringComparer.Ordinal) ? Sort ?? string.Empty : string.Empty;
+
+    private string SeoDescription =>
+        string.IsNullOrWhiteSpace(category?.Description)
+            ? Language["category.lead"]
+            : category!.Description!;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        categories = await CategoryService.GetActiveAsync();
+        category = categories.FirstOrDefault(c => string.Equals(c.Slug, Slug, StringComparison.OrdinalIgnoreCase));
+
+        if (category is null)
+        {
+            result = null;
+            return;
+        }
+
+        result = await ProductService.GetPublicPagedAsync(new PublicProductFilter
+        {
+            CategorySlug = category.Slug,
+            Sort = SortKey,
+            Page = PageNumber < 1 ? 1 : PageNumber
+        });
+    }
+
+    private string ListUrl(string sort, int pageNumber)
+    {
+        var query = new List<string>();
+        if (!string.IsNullOrEmpty(sort)) query.Add("sort=" + Uri.EscapeDataString(sort));
+        if (pageNumber > 1) query.Add("page=" + pageNumber);
+        var path = "/category/" + Uri.EscapeDataString(category?.Slug ?? Slug);
+        return query.Count == 0 ? path : path + "?" + string.Join("&", query);
+    }
+}

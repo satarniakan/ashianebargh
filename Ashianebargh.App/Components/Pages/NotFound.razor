@@ -1,5 +1,8 @@
 ﻿@page "/not-found"
+@attribute [AllowAnonymous]
 @layout MainLayout
+@using Ashianebargh.App.Services
+@using Microsoft.AspNetCore.Http
 @inject NavigationManager NavigationManager
 
 <PageTitle>صفحه یافت نشد</PageTitle>
@@ -67,12 +70,22 @@
 </style>
 
 @code {
+    /// <summary>آدرس درخواست‌شده از روتر؛ اگر نیاید از کوئریِ from خوانده می‌شود.</summary>
+    [Parameter] public string? From { get; set; }
+
     private string? attemptedPath;
 
     protected override void OnInitialized()
     {
-        // وقتی UseStatusCodePagesWithReExecute صفحه را دوباره اجرا می‌کند، مسیر اصلی
-        // در کوئری‌استرینگ قرار می‌گیرد تا بتوانیم به کاربر نشان دهیم چه آدرسی را خواسته بود.
+        NotFoundStatus.Mark(HttpContext?.Response);
+
+        if (!string.IsNullOrWhiteSpace(From))
+        {
+            attemptedPath = From;
+            return;
+        }
+
+        // هدفِ مستقیم این صفحه ممکن است با from= باز شود (پیوندهای قدیمی).
         var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
         var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
 
@@ -81,4 +94,6 @@
             attemptedPath = from.ToString();
         }
     }
+
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
 }

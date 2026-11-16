@@ -1,9 +1,12 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Ashianebargh.Application.DTOs;
 using Ashianebargh.Application.Helpers;
+using Ashianebargh.Application.Validators;
+using Ashianebargh.Domain.Entities;
 using Ashianebargh.Domain.Enums;
 using Ashianebargh.Domain.Identity;
 using Ashianebargh.Domain.Interfaces;
@@ -14,7 +17,13 @@ namespace Ashianebargh.Application.Services;
 public interface IAuthService
 {
     Task<PasswordLoginResult> LoginWithPasswordAsync(string userName, string password);
-    Task RequestOtpAsync(string phoneNumber);
+
+    /// <summary>
+    /// درخواست کد پیامکی برای یک هدف مشخص. هدف باید با هدفِ تأیید یکی باشد،
+    /// وگرنه کد صادرشده در مسیر دیگر پذیرفته نمی‌شود (کد ورود ≠ کد تعیین رمز).
+    /// </summary>
+    Task RequestOtpAsync(string phoneNumber, OtpPurpose purpose = OtpPurpose.Login);
+
     Task<OtpVerificationResult> VerifyOtpAsync(string phoneNumber, string code);
     Task LogoutAsync();
     Task<UserProfileDto?> GetProfileAsync(string userId);
@@ -40,7 +49,19 @@ public class AuthService : IAuthService
     private readonly IHttpContextAccessor _httpContext;
     private readonly IApiTokenService _tokens;
     private readonly IAshianebarghUnitOfWork _unitOfWork;
+    private readonly IPasswordHasher<ApplicationUser> _passwordHasher;
+    private readonly IMemoryCache? _cache;
+    private readonly IAuditService? _audit;
     private readonly string? _firstAdminPhoneNumber;
+
+    /// <summary>
+    /// هشِ یک رمز تصادفیِ دورریختنی، فقط برای اینکه مسیر «کاربر ناموجود» همان هزینهٔ
+    /// محاسباتیِ مسیر «رمز اشتباه» را بدهد. بدون این، تفاوتِ زمان پاسخ به مهاجم می‌گوید
+    /// کدام نام کاربری/ایمیل در سامانه ثبت شده است (user enumeration).
+    /// یک‌بار ساخته می‌شود تا هزینهٔ ساخت هش روی هر درخواست نیفتد.
+    /// </summary>
+    private static readonly string DummyPasswordHash =
+        new PasswordHasher<ApplicationUser>().HashPassword(new ApplicationUser(), Guid.NewGuid().ToString("N"));
 
     public AuthService(
         UserManager<ApplicationUser> userManager,
@@ -52,7 +73,10 @@ public class AuthService : IAuthService
         IApiTokenService tokens,
         IAshianebarghUnitOfWork unitOfWork,
         IConfiguration configuration,
-        ILogger<AuthService> logger)
+        ILogger<AuthService> logger,
+        IPasswordHasher<ApplicationUser>? passwordHasher = null,
+        IMemoryCache? cache = null,
+        IAuditService? audit = null)
     {
         _userManager = userManager;
         _signInManager = signInManager;
@@ -63,6 +87,9 @@ public class AuthService : IAuthService
         _tokens = tokens;
         _unitOfWork = unitOfWork;
         _logger = logger;
+        _passwordHasher = passwordHasher ?? new PasswordHasher<ApplicationUser>();
+        _cache = cache;
+        _audit = audit;
         // شمارهٔ ادمین اول فقط از تنظیمات «Identity:FirstAdminPhoneNumber» خوانده می‌شود.
         // اگر تنظیم نباشد، هیچ شماره‌ای خودکار نقش Admin نمی‌گیرد.
         // هر دو سمت مقایسه نرمال می‌شوند (ارقام فارسیِ تنظیمات هم ممکن است فارسی تایپ شده باشد).
@@ -79,11 +106,24 @@ public class AuthService : IAuthService
     public async Task<PasswordLoginResult> LoginWithPasswordAsync(string userName, string password)
     {
         var (ip, userAgent) = RequestInfo();
+
+        // ورودیِ بلند پیش از کوئری دیتابیس و هش‌کردن رد می‌شود: هم سقف ستون‌های Identity
+        // است و هم هزینهٔ PBKDF2 روی رمزِ مگابایتی. پاسخ همان «ناموفق» عمومی است.
+        if (!AuthInput.IsWithinLengthBounds(userName, password))
+        {
+            _logger.LogWarning("Login failed: input exceeds length bounds");
+            await _history.RecordAsync(null, userName, false, "Password", ip, userAgent, "invalid-credentials");
+            return new PasswordLoginResult(false);
+        }
+
         var user = await FindByUserNameOrEmailAsync(userName);
 
         if (user is null)
         {
-            _logger.LogWarning("Login failed: no user found for {UserName}", userName);
+            // همان هزینهٔ محاسباتیِ مسیرِ کاربرِ موجود، تا زمان پاسخ وجود حساب را لو ندهد.
+            _passwordHasher.VerifyHashedPassword(new ApplicationUser(), DummyPasswordHash, password);
+
+            _logger.LogWarning("Login failed: no user found for {UserName}", PiiMask.Recipient(userName));
             await _history.RecordAsync(null, userName, false, "Password", ip, userAgent, "invalid-credentials");
             return new PasswordLoginResult(false);
         }
@@ -94,7 +134,7 @@ public class AuthService : IAuthService
         if (!result.Succeeded)
         {
             var reason = result.IsLockedOut ? "locked-out" : "invalid-credentials";
-            _logger.LogWarning("Login failed for {UserName}: {Reason}", userName,
+            _logger.LogWarning("Login failed for {UserName}: {Reason}", PiiMask.Recipient(userName),
                 result.IsLockedOut ? "locked out" : result.IsNotAllowed ? "not allowed" : "invalid password");
             await _history.RecordAsync(user.Id, userName, false, "Password", ip, userAgent, reason);
         }
@@ -106,8 +146,8 @@ public class AuthService : IAuthService
         return new PasswordLoginResult(result.Succeeded);
     }
 
-    public Task RequestOtpAsync(string phoneNumber) =>
-        _otpService.GenerateAndSendOtpAsync(PersianSearch.NormalizePhone(phoneNumber));
+    public Task RequestOtpAsync(string phoneNumber, OtpPurpose purpose = OtpPurpose.Login) =>
+        _otpService.GenerateAndSendOtpAsync(PersianSearch.NormalizePhone(phoneNumber), purpose);
 
     public async Task<OtpVerificationResult> VerifyOtpAsync(string phoneNumber, string code)
     {
@@ -117,7 +157,7 @@ public class AuthService : IAuthService
 
         var (ip, userAgent) = RequestInfo();
 
-        if (!await _otpService.VerifyOtpAsync(phoneNumber, code))
+        if (!await _otpService.VerifyOtpAsync(phoneNumber, code, OtpPurpose.Login))
         {
             await _history.RecordAsync(null, phoneNumber, false, "Otp", ip, userAgent, "invalid-otp");
             return new OtpVerificationResult(false, false);
@@ -165,7 +205,7 @@ public class AuthService : IAuthService
                     user, Roles.DefaultRoleFor(_firstAdminPhoneNumber, phoneNumber));
 
                 await _notifications.NotifyRoleAsync(Roles.Admin, "کاربر جدید ثبت‌نام کرد",
-                    $"شماره {phoneNumber}", NotificationType.System, "/admin/users");
+                    $"شماره {PiiMask.Phone(phoneNumber)}", NotificationType.System, "/admin/users");
             }
         }
 
@@ -187,6 +227,37 @@ public class AuthService : IAuthService
             user.FullName,
             user.Email,
             await _userManager.HasPasswordAsync(user));
+    }
+
+    /// <summary>
+    /// سقف نوشتن رمز از مسیر پروفایل در هر بازه، به‌ازای هر کاربر.
+    /// چرا داخل سرویس: صفحهٔ پروفایل یک circuit بلazor است و رویدادهایش از middleware
+    /// محدودیت نرخ HTTP رد نمی‌شوند، پس policy «profile» عملاً از آن محافظت نمی‌کرد.
+    /// هر نوشتن رمز یک PBKDF2 پرهزینه است؛ بدون سقف، یک کاربرِ واردشده CPU سرور را می‌سوزاند.
+    /// مثل خودِ rate limiter این شمارنده درون‌فرایندی است (استقرار چندسروره به Redis نیاز دارد).
+    /// </summary>
+    private const int MaxPasswordWritesPerWindow = 5;
+
+    private static readonly TimeSpan PasswordWriteWindow = TimeSpan.FromMinutes(10);
+
+    /// <summary>قفل سراسریِ خواندن/افزایش شمارنده تا دو رویداد همزمان یکی دیگری را گم نکنند.</summary>
+    private static readonly object PasswordThrottleGate = new();
+
+    private bool TryConsumePasswordWriteQuota(string userId)
+    {
+        if (_cache is null) return true;
+
+        var key = $"profile-password-writes:{userId}";
+        lock (PasswordThrottleGate)
+        {
+            var count = _cache.TryGetValue(key, out int current) ? current : 0;
+            if (count >= MaxPasswordWritesPerWindow) return false;
+
+            // وقتی سقف پر است دیگر Set صدا زده نمی‌شود، پس پنجره ۱۰ دقیقه بعد از
+            // آخرین نوشتنِ مجاز بسته می‌شود (نه اینکه با تلاش‌های مسدود تمدید شود).
+            _cache.Set(key, count + 1, PasswordWriteWindow);
+            return true;
+        }
     }
 
     public async Task<ProfileUpdateResult> UpdateProfileAsync(
@@ -226,6 +297,10 @@ public class AuthService : IAuthService
 
             if (password != confirmPassword)
                 return new ProfileUpdateResult(ProfileUpdateStatus.PasswordMismatch);
+
+            // پس از بررسی‌های ارزان و پیش از هش‌کردن: تلاشِ مسدود نباید PBKDF2 بسوزاند.
+            if (!TryConsumePasswordWriteQuota(userId))
+                return new ProfileUpdateResult(ProfileUpdateStatus.TooManyPasswordAttempts);
         }
 
         ProfileUpdateStatus? failure = null;
@@ -278,6 +353,11 @@ public class AuthService : IAuthService
             return new ProfileUpdateResult(failure!.Value);
         }
 
+        // تعیین نخستین رمز یک رویداد امنیتی است (راه ورود رمزی به حساب باز می‌شود).
+        if (setPassword && _audit is not null)
+            await _audit.LogEventAsync("password.set", null,
+                "رمز عبور برای نخستین بار تعیین شد.", actorId: userId);
+
         return new ProfileUpdateResult(ProfileUpdateStatus.Success);
     }
 
@@ -302,8 +382,9 @@ public class AuthService : IAuthService
         if (newPassword != confirmPassword)
             return new PasswordResetResult(PasswordResetStatus.PasswordMismatch);
 
-        // کد اول مصرف می‌شود (تک‌مصرف): اگر ریست بعدش شکست بخورد، کاربر باید کد تازه بگیرد
-        if (!await _otpService.VerifyOtpAsync(phoneNumber, code))
+        // کد اول مصرف می‌شود (تک‌مصرف): اگر ریست بعدش شکست بخورد، کاربر باید کد تازه بگیرد.
+        // هدف PasswordReset است، پس کدِ ورودِ کاربر اینجا پذیرفته نمی‌شود.
+        if (!await _otpService.VerifyOtpAsync(phoneNumber, code, OtpPurpose.PasswordReset))
             return new PasswordResetResult(PasswordResetStatus.InvalidOtp);
 
         var user = await _userManager.FindByNameAsync(phoneNumber);
@@ -324,6 +405,10 @@ public class AuthService : IAuthService
         // دزدیده‌شده با وجود ریست، تا ۱۸۰ روز دسترسی داشت). کوکی‌ها هم با تغییر
         // SecurityStamp در Identity حداکثر تا بازاعتبارسنجی بعدی می‌میرند.
         await _tokens.RevokeAllAsync(user.Id);
+
+        if (_audit is not null)
+            await _audit.LogEventAsync("password.reset", null,
+                "رمز عبور با کد پیامکی بازنشانی شد؛ همهٔ توکن‌های API لغو شدند.", actorId: user.Id);
 
         return new PasswordResetResult(PasswordResetStatus.Success, user.Id);
     }

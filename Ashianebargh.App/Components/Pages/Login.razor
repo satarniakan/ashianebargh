@@ -1,4 +1,5 @@
 @page "/login"
+@attribute [AllowAnonymous]
 @attribute [ExcludeFromInteractiveRouting]
 <PageTitle>ورود</PageTitle>
 
@@ -22,14 +23,7 @@
                 <input type="tel" name="phoneNumber" class="form-control" placeholder="09xxxxxxxxx" required pattern="09[0-9]{9}" />
             </div>
 
-            @if (!string.IsNullOrWhiteSpace(turnstileSiteKey))
-            {
-                @* کپچا فقط وقتی SiteKey تنظیم شده رندر می‌شود؛ در غیر این صورت endpoint بدون کپچا کار می‌کند *@
-                <div class="mb-4">
-                    <div class="cf-turnstile" data-sitekey="@turnstileSiteKey" data-language="fa"></div>
-                </div>
-                <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-            }
+            <TurnstileWidget />
 
             <button type="submit" class="btn btn-primary w-100">ارسال کد ورود</button>
         </form>
@@ -43,18 +37,4 @@
 @code {
     [SupplyParameterFromQuery(Name = "error")]
     private string? Error { get; set; }
-
-    [Inject] private Ashianebargh.Application.Services.ISettingService Settings { get; set; } = default!;
-
-    private string? turnstileSiteKey;
-
-    protected override async Task OnInitializedAsync()
-    {
-        // کلید عمومی از تنظیمات (ردیف دیتابیس، وگرنه appsettings) — خالی یعنی کپچا غیرفعال
-        turnstileSiteKey = await Settings.GetEffectiveAsync(
-            Ashianebargh.Domain.Identity.IntegrationSettingKeys.TurnstileSiteKey,
-            "Captcha:Turnstile:SiteKey");
-        if (string.IsNullOrWhiteSpace(turnstileSiteKey))
-            turnstileSiteKey = null;
-    }
 }

@@ -117,6 +117,19 @@ public static class TestContentSeeder
             db.Set<Product>().Add(product);
             addedProducts++;
 
+            // چند ردیف مشخصات از خودِ دادهٔ منیفست ساخته می‌شود تا جدول «مشخصات محصول»
+            // در محیط توسعه خالی نباشد؛ محتوای واقعی را ادمین وارد می‌کند.
+            var specIndex = 0;
+            void AddSpec(string title, string? value)
+            {
+                if (string.IsNullOrWhiteSpace(value)) return;
+                product.Specs.Add(new ProductSpec { Title = title, Value = value, SortOrder = specIndex++ });
+            }
+
+            AddSpec("کد محصول", mp.code);
+            AddSpec("گروه محصول", mp.group);
+            AddSpec("دسته‌بندی", category.Name);
+
             // پیوست‌ها با ناوبری رابطه اضافه می‌شوند تا کلید خارجی درست ساخته شود.
             foreach (var mf in mp.files ?? [])
             {
@@ -175,7 +188,11 @@ public static class TestContentSeeder
         {
             var table = db.Model.FindEntityType(type)?.GetTableName();
             if (string.IsNullOrEmpty(table)) continue;
+            // نام جدول از مدل EF می‌آید (ورودی کاربر نیست)، پس تزریق SQL ممکن نیست؛
+            // EF1002 فقط رشتهٔ درون‌یابی‌شده را می‌بیند و اینجا آگاهانه خاموش می‌شود.
+#pragma warning disable EF1002
             await db.Database.ExecuteSqlRawAsync($"DELETE FROM [{table}]");
+#pragma warning restore EF1002
         }
         db.ChangeTracker.Clear();
 

@@ -33,6 +33,8 @@ public class ApiTokenServiceTests
         public Mock<SignInManager<ApplicationUser>> SignIn { get; } = CreateSignInManager();
         public Mock<IUserClaimsPrincipalFactory<ApplicationUser>> Factory { get; } = new();
         public Mock<IAshianebarghUnitOfWork> Uow { get; } = new();
+        public Mock<IPasswordHasher<ApplicationUser>> Hasher { get; } = new();
+        public Mock<IAuditService> Audit { get; } = new();
 
         public Harness()
         {
@@ -63,7 +65,9 @@ public class ApiTokenServiceTests
                 settings.Object,
                 new ConfigurationBuilder().Build(),
                 NullLogger<ApiTokenService>.Instance,
-                new FixedTimeProvider());
+                new FixedTimeProvider(),
+                Hasher.Object,
+                Audit.Object);
         }
 
         private static Mock<UserManager<ApplicationUser>> CreateUserManager()
@@ -101,6 +105,43 @@ public class ApiTokenServiceTests
         Assert.Equal(ApiTokenService.HashToken(raw), stored.TokenHash);
         Assert.NotEqual(raw, stored.TokenHash);
         Assert.Equal("گوشی من", stored.DeviceName);
+    }
+
+    [Fact]
+    public async Task IssueAsync_EmitsTokenIssuedAudit_WithActorId()
+    {
+        var h = new Harness();
+
+        await h.Build().IssueAsync("u1", "گوشی من");
+
+        // صدور توکن یک رویداد امنیتی است؛ actor همان کاربرِ صاحب توکن است.
+        h.Audit.Verify(a => a.LogEventAsync("token.issued", null, It.IsAny<string>(), "u1", null), Times.Once);
+    }
+
+    [Fact]
+    public async Task RevokeAsync_EmitsTokenRevokedAudit()
+    {
+        var h = new Harness();
+        var service = h.Build();
+        await service.IssueAsync("u1", null);
+        var tokenId = h.TokensByHash.Values.Single().Id;
+
+        Assert.True(await service.RevokeAsync(tokenId, "u1"));
+
+        h.Audit.Verify(a => a.LogEventAsync("token.revoked", null, It.IsAny<string>(), "u1", null), Times.Once);
+    }
+
+    [Fact]
+    public async Task RevokeAllAsync_EmitsTokenRevokedAllAudit()
+    {
+        var h = new Harness();
+        var service = h.Build();
+        await service.IssueAsync("u1", null);
+
+        Assert.Equal(1, await service.RevokeAllAsync("u1"));
+
+        // «خروج از همهٔ دستگاه‌ها» در Sessions.razor هم از همین مسیر می‌گذرد.
+        h.Audit.Verify(a => a.LogEventAsync("token.revoked-all", null, It.IsAny<string>(), "u1", null), Times.Once);
     }
 
     [Fact]
@@ -172,7 +213,7 @@ public class ApiTokenServiceTests
     {
         var h = new Harness();
         var service = h.Build();
-        h.Otp.Setup(o => o.VerifyOtpAsync("09120000000", "000000")).ReturnsAsync(false);
+        h.Otp.Setup(o => o.VerifyOtpAsync("09120000000", "000000", OtpPurpose.ApiToken)).ReturnsAsync(false);
 
         var result = await service.VerifyOtpAndIssueTokenAsync("09120000000", "000000", null);
 
@@ -182,7 +223,7 @@ public class ApiTokenServiceTests
     }
 
     [Fact]
-    public async Task LoginWithPassword_UnknownUser_ReturnsFailure_WithoutPasswordCheck()
+    public async Task LoginWithPassword_UnknownUser_ReturnsFailure_WithoutTouchingSignInManager()
     {
         var h = new Harness();
         var service = h.Build();
@@ -193,9 +234,45 @@ public class ApiTokenServiceTests
 
         Assert.False(result.Succeeded);
         Assert.Null(result.Token);
+        // SignInManager صدا زده نمی‌شود (شمارندهٔ قفلِ حسابِ ناموجود معنا ندارد)،
+        // ولی هزینهٔ هش پرداخت می‌شود تا زمان پاسخ، ثبت‌شده‌بودن نام کاربری را لو ندهد.
         h.SignIn.Verify(s => s.CheckPasswordSignInAsync(
             It.IsAny<ApplicationUser>(), It.IsAny<string>(), It.IsAny<bool>()), Times.Never);
+        h.Hasher.Verify(x => x.VerifyHashedPassword(
+            It.IsAny<ApplicationUser>(), It.IsAny<string>(), "whatever"), Times.Once);
         Assert.Empty(h.TokensByHash);
+    }
+
+    [Fact]
+    public async Task VerifyOtpAndIssueToken_UnknownUser_StillVerifiesOtp()
+    {
+        // ترتیب «اول کد، بعد کاربر»: مسیر شمارهٔ ناموجود هم همان کارِ شمارهٔ ثبت‌شده را
+        // انجام می‌دهد، وگرنه اختلاف زمان به مهاجم می‌گوید کدام شماره ثبت شده است.
+        var h = new Harness();
+        var service = h.Build();
+        h.Users.Setup(u => u.FindByNameAsync("09120000000")).ReturnsAsync((ApplicationUser?)null);
+        h.Otp.Setup(o => o.VerifyOtpAsync("09120000000", "123456", OtpPurpose.ApiToken)).ReturnsAsync(true);
+
+        var result = await service.VerifyOtpAndIssueTokenAsync("09120000000", "123456", null);
+
+        Assert.False(result.Succeeded);
+        h.Otp.Verify(o => o.VerifyOtpAsync("09120000000", "123456", OtpPurpose.ApiToken), Times.Once);
+        Assert.Empty(h.TokensByHash);
+    }
+
+    [Fact]
+    public async Task LoginWithPassword_OverlongInput_ReturnsFailure_WithoutQueryOrHash()
+    {
+        var h = new Harness();
+        var service = h.Build();
+
+        var result = await service.LoginWithPasswordAndIssueTokenAsync(
+            new string('a', 5000), "whatever", null);
+
+        Assert.False(result.Succeeded);
+        h.Users.Verify(u => u.FindByEmailAsync(It.IsAny<string>()), Times.Never);
+        h.Hasher.Verify(x => x.VerifyHashedPassword(
+            It.IsAny<ApplicationUser>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
     }
 
     [Fact]

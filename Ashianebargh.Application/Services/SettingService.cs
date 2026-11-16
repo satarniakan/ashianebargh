@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Ashianebargh.Domain.Exceptions;
 using Ashianebargh.Domain.Identity;
 using Ashianebargh.Domain.Interfaces;
 
@@ -125,6 +126,11 @@ public class SettingService : ISettingService
 
     public async Task SetAsync(string key, string? value)
     {
+        // فقط کلیدهای شناخته‌شده قابل نوشتن‌اند؛ جلوی نوشتن کلید دلخواه/ناشناخته را
+        // می‌گیرد (مثلاً از مسیر ادمینِ آسیب‌دیده یا کد جدیدِ اشتباه).
+        if (!IsKnownKey(key))
+            throw new BusinessRuleException($"کلید تنظیم «{key}» شناخته‌شده نیست.");
+
         var stored = string.IsNullOrEmpty(value) ? value : ProtectIfNeeded(key, value);
 
         await _repository.UpsertAsync(new Domain.Entities.Setting
@@ -148,6 +154,9 @@ public class SettingService : ISettingService
 
     public async Task ClearAsync(string key)
     {
+        if (!IsKnownKey(key))
+            throw new BusinessRuleException($"کلید تنظیم «{key}» شناخته‌شده نیست.");
+
         await _repository.DeleteAsync(key);
         await _unitOfWork.CompleteAsync();
         InvalidateCaches(key);
@@ -180,6 +189,14 @@ public class SettingService : ISettingService
 
     private bool IsSecret(string key) =>
         _catalog.All.Any(d => d.Key == key && d.IsSecret);
+
+    /// <summary>
+    /// کلید قابل نوشتن = کلید کاتالوگ میزبان یا یکی از کلیدهای خودِ پایه.
+    /// کاتالوگ تنها منبع حقیقت تنظیمات قابل‌ویرایش است؛ کلید ناشناخته رد می‌شود.
+    /// </summary>
+    private bool IsKnownKey(string key) =>
+        _catalog.All.Any(d => d.Key == key) ||
+        key is FrameworkSettingKeys.SiteName or FrameworkSettingKeys.OtpSmsTemplate or FrameworkSettingKeys.SiteCatalogFile;
 
     private string ProtectIfNeeded(string key, string value)
     {

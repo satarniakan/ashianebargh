@@ -1,0 +1,26 @@
+@using Ashianebargh.Application.Services
+@using Ashianebargh.Domain.Identity
+@inject ISettingService Settings
+
+@* ویجت کپچای Turnstile — یک پیاده‌سازی مشترک برای همهٔ فرم‌های ورود/تعیین رمز.
+   کلید عمومی از تنظیمات می‌آید (ردیف دیتابیس، وگرنه appsettings)؛ خالی یعنی کپچا
+   غیرفعال است و ویجت رندر نمی‌شود (توسعهٔ محلی بدون کلید Cloudflare). *@
+@if (!string.IsNullOrWhiteSpace(siteKey))
+{
+    <div class="mb-4">
+        <div class="cf-turnstile" data-sitekey="@siteKey" data-language="fa"></div>
+    </div>
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+}
+
+@code {
+    private string? siteKey;
+
+    protected override async Task OnInitializedAsync()
+    {
+        siteKey = await Settings.GetEffectiveAsync(
+            IntegrationSettingKeys.TurnstileSiteKey, "Captcha:Turnstile:SiteKey");
+        if (string.IsNullOrWhiteSpace(siteKey))
+            siteKey = null;
+    }
+}

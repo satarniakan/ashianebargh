@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Ashianebargh.Application.DTOs;
 using Ashianebargh.Application.Services;
+using Ashianebargh.Domain.Entities;
 using Ashianebargh.Domain.Identity;
 using Ashianebargh.Domain.Interfaces;
 
@@ -21,6 +22,7 @@ public class AuthServiceTests
         public Mock<IOtpService> Otp { get; } = new();
         public Mock<IApiTokenService> Tokens { get; } = new();
         public Mock<IAshianebarghUnitOfWork> UnitOfWork { get; } = CreateUnitOfWork();
+        public Mock<IAuditService> Audit { get; } = new();
 
         public AuthService Build()
         {
@@ -40,7 +42,8 @@ public class AuthServiceTests
                 Tokens.Object,
                 UnitOfWork.Object,
                 new ConfigurationBuilder().Build(),
-                NullLogger<AuthService>.Instance);
+                NullLogger<AuthService>.Instance,
+                audit: Audit.Object);
         }
 
         private static Mock<IAshianebarghUnitOfWork> CreateUnitOfWork()
@@ -71,7 +74,7 @@ public class AuthServiceTests
     public async Task ResetPassword_InvalidOtp_ReturnsInvalidOtp_WithoutUserLookup()
     {
         var h = new Harness();
-        h.Otp.Setup(o => o.VerifyOtpAsync("09120000000", "000000")).ReturnsAsync(false);
+        h.Otp.Setup(o => o.VerifyOtpAsync("09120000000", "000000", OtpPurpose.PasswordReset)).ReturnsAsync(false);
 
         var result = await h.Build().ResetPasswordWithOtpAsync("09120000000", "000000", "new-pass-1", "new-pass-1");
 
@@ -83,7 +86,7 @@ public class AuthServiceTests
     public async Task ResetPassword_UnknownUser_ReturnsUserNotFound()
     {
         var h = new Harness();
-        h.Otp.Setup(o => o.VerifyOtpAsync(It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync(true);
+        h.Otp.Setup(o => o.VerifyOtpAsync(It.IsAny<string>(), It.IsAny<string>(), OtpPurpose.PasswordReset)).ReturnsAsync(true);
         h.Users.Setup(u => u.FindByNameAsync("09120000000")).ReturnsAsync((ApplicationUser?)null);
 
         var result = await h.Build().ResetPasswordWithOtpAsync("09120000000", "123456", "new-pass-1", "new-pass-1");
@@ -95,14 +98,14 @@ public class AuthServiceTests
     public async Task ResetPassword_Mismatch_ReturnsPasswordMismatch_WithoutConsumingOtp()
     {
         var h = new Harness();
-        h.Otp.Setup(o => o.VerifyOtpAsync(It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync(true);
+        h.Otp.Setup(o => o.VerifyOtpAsync(It.IsAny<string>(), It.IsAny<string>(), OtpPurpose.PasswordReset)).ReturnsAsync(true);
         h.Users.Setup(u => u.FindByNameAsync("09120000000")).ReturnsAsync(User());
 
         var result = await h.Build().ResetPasswordWithOtpAsync("09120000000", "123456", "aaa", "bbb");
 
         Assert.Equal(PasswordResetStatus.PasswordMismatch, result.Status);
         // کد پیامکی مصرف نمی‌شود — کاربر بدون گرفتن کد تازه می‌تواند تصحیح کند.
-        h.Otp.Verify(o => o.VerifyOtpAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+        h.Otp.Verify(o => o.VerifyOtpAsync(It.IsAny<string>(), It.IsAny<string>(), OtpPurpose.PasswordReset), Times.Never);
         h.Users.Verify(u => u.GeneratePasswordResetTokenAsync(It.IsAny<ApplicationUser>()), Times.Never);
     }
 
@@ -111,7 +114,7 @@ public class AuthServiceTests
     {
         var h = new Harness();
         var user = User();
-        h.Otp.Setup(o => o.VerifyOtpAsync(It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync(true);
+        h.Otp.Setup(o => o.VerifyOtpAsync(It.IsAny<string>(), It.IsAny<string>(), OtpPurpose.PasswordReset)).ReturnsAsync(true);
         h.Users.Setup(u => u.FindByNameAsync("09120000000")).ReturnsAsync(user);
         h.Users.Setup(u => u.GeneratePasswordResetTokenAsync(user)).ReturnsAsync("tok");
         h.Users.Setup(u => u.ResetPasswordAsync(user, "tok", "123"))
@@ -127,7 +130,7 @@ public class AuthServiceTests
     {
         var h = new Harness();
         var user = User();
-        h.Otp.Setup(o => o.VerifyOtpAsync(It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync(true);
+        h.Otp.Setup(o => o.VerifyOtpAsync(It.IsAny<string>(), It.IsAny<string>(), OtpPurpose.PasswordReset)).ReturnsAsync(true);
         h.Users.Setup(u => u.FindByNameAsync("09120000000")).ReturnsAsync(user);
         h.Users.Setup(u => u.GeneratePasswordResetTokenAsync(user)).ReturnsAsync("tok");
         h.Users.Setup(u => u.ResetPasswordAsync(user, "tok", "new-pass-1"))
@@ -146,7 +149,7 @@ public class AuthServiceTests
     {
         var h = new Harness();
         var user = User();
-        h.Otp.Setup(o => o.VerifyOtpAsync(It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync(true);
+        h.Otp.Setup(o => o.VerifyOtpAsync(It.IsAny<string>(), It.IsAny<string>(), OtpPurpose.PasswordReset)).ReturnsAsync(true);
         h.Users.Setup(u => u.FindByNameAsync("09120000000")).ReturnsAsync(user);
         h.Users.Setup(u => u.GeneratePasswordResetTokenAsync(user)).ReturnsAsync("tok");
         h.Users.Setup(u => u.ResetPasswordAsync(user, "tok", "new-pass-1"))
@@ -160,10 +163,46 @@ public class AuthServiceTests
     }
 
     [Fact]
+    public async Task ResetPassword_Success_EmitsPasswordResetAudit()
+    {
+        var h = new Harness();
+        var user = User();
+        h.Otp.Setup(o => o.VerifyOtpAsync(It.IsAny<string>(), It.IsAny<string>(), OtpPurpose.PasswordReset)).ReturnsAsync(true);
+        h.Users.Setup(u => u.FindByNameAsync("09120000000")).ReturnsAsync(user);
+        h.Users.Setup(u => u.GeneratePasswordResetTokenAsync(user)).ReturnsAsync("tok");
+        h.Users.Setup(u => u.ResetPasswordAsync(user, "tok", "new-pass-1"))
+            .ReturnsAsync(IdentityResult.Success);
+
+        var result = await h.Build().ResetPasswordWithOtpAsync("09120000000", "123456", "new-pass-1", "new-pass-1");
+
+        Assert.Equal(PasswordResetStatus.Success, result.Status);
+        h.Audit.Verify(a => a.LogEventAsync("password.reset", null, It.IsAny<string>(), "u1", null), Times.Once);
+    }
+
+    [Fact]
+    public async Task ResetPassword_IdentityRejects_DoesNotEmitAudit()
+    {
+        var h = new Harness();
+        var user = User();
+        h.Otp.Setup(o => o.VerifyOtpAsync(It.IsAny<string>(), It.IsAny<string>(), OtpPurpose.PasswordReset)).ReturnsAsync(true);
+        h.Users.Setup(u => u.FindByNameAsync("09120000000")).ReturnsAsync(user);
+        h.Users.Setup(u => u.GeneratePasswordResetTokenAsync(user)).ReturnsAsync("tok");
+        h.Users.Setup(u => u.ResetPasswordAsync(user, "tok", "123"))
+            .ReturnsAsync(IdentityResult.Failed(new IdentityError { Description = "کوتاه است." }));
+
+        var result = await h.Build().ResetPasswordWithOtpAsync("09120000000", "123456", "123", "123");
+
+        Assert.Equal(PasswordResetStatus.ResetFailed, result.Status);
+        // رویداد audit فقط پس از موفقیت ثبت می‌شود، نه برای تلاشِ شکست‌خورده.
+        h.Audit.Verify(a => a.LogEventAsync("password.reset", It.IsAny<string?>(), It.IsAny<string>(),
+            It.IsAny<string?>(), It.IsAny<string?>()), Times.Never);
+    }
+
+    [Fact]
     public async Task ResetPassword_Failure_DoesNotRevokeApiTokens()
     {
         var h = new Harness();
-        h.Otp.Setup(o => o.VerifyOtpAsync(It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync(false);
+        h.Otp.Setup(o => o.VerifyOtpAsync(It.IsAny<string>(), It.IsAny<string>(), OtpPurpose.PasswordReset)).ReturnsAsync(false);
 
         var result = await h.Build().ResetPasswordWithOtpAsync("09120000000", "000000", "x", "x");
 

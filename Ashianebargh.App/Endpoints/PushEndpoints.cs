@@ -33,7 +33,7 @@ public static class PushEndpoints
                 publicKey = key,
                 enabled = !string.IsNullOrWhiteSpace(key)
             });
-        });
+        }).AllowAnonymous();
 
         app.MapPost("/api/v1/push/subscriptions", async (
             ClaimsPrincipal user,

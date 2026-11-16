@@ -1,9 +1,8 @@
-﻿// Ashianebargh.App/Program.cs
+// Ashianebargh.App/Program.cs
 // میزبان خالی: پایه را بدون هیچ دامنه‌ای بالا می‌آورد. دامنهٔ خودتان را با
 // IAshianebarghModule / IPermissionCatalog / INavProvider وصل کنید.
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.DataProtection;
 using Ashianebargh.Infrastructure;
 using Ashianebargh.Infrastructure.Data;
 using Ashianebargh.App;
@@ -20,9 +19,14 @@ Log.Logger = new LoggerConfiguration()
 var builder = WebApplication.CreateBuilder(args);
 
 // Razor Components (Blazor Server)
+// سقف آپلود در مدار Blazor: پیش‌فرضِ ۳۲کیلوبایتیِ SignalR آپلودهای بزرگ را می‌شکند
+// و مقدار بی‌نهایت هم DoS می‌آورد. به همان سقف ذخیره‌سازی گره می‌خورد (+۱MB حاشیهٔ
+// پیام) تا مدار هرگز بیش از آنچه قابل ذخیره است نپذیرد.
+var maxUploadBytes = builder.Configuration.GetValue<long>("Storage:MaxFileSizeBytes", 50 * 1024 * 1024);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents()
-    .AddCircuitOptions(o => o.DetailedErrors = builder.Environment.IsDevelopment());
+    .AddCircuitOptions(o => o.DetailedErrors = builder.Environment.IsDevelopment())
+    .AddHubOptions(o => o.MaximumReceiveMessageSize = maxUploadBytes + 1024 * 1024);
 
 // لاگر نهایی از appsettings خوانده می‌شود؛ سطح لاگ بین Development و Production فرق می‌کند.
 builder.Host.UseSerilog((context, services, configuration) => configuration
@@ -36,9 +40,9 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
         retainedFileCountLimit: 14,
         outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] {Message:lj}{NewLine}{Exception}"));
 
-// Persist Data Protection keys so cookies/antiforgery tokens survive app restarts
-builder.Services.AddDataProtection()
-    .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(builder.Environment.ContentRootPath, "DataProtection-Keys")));
+// کلیدهای DataProtection ماندگار می‌شوند تا کوکی/توکن ضدجعل با restart نپرد.
+// پیکربندی در DataProtectionSetup است تا بدون بالا آوردن کل میزبان قابل تست باشد.
+builder.Services.AddAshianebarghDataProtection(builder.Configuration, builder.Environment.ContentRootPath);
 
 // هر لایه تنظیمات سرویس‌های خودش را رجیستر می‌کند.
 // مایگریشن‌ها در همین مونتاژ میزبان‌اند (پوشهٔ Migrations) تا اسکیمای دامنه وارد پایه نشود.
@@ -51,13 +55,24 @@ builder.Services.AddAppWeb();
 
 builder.Services.AddHealthChecks().AddDbContextCheck<AshianebarghDbContext>();
 
+// HSTS یک‌ساله با زیردامنه‌ها؛ پیش‌فرضِ ۳۰روزهٔ UseHsts برای production ضعیف است.
+// Preload عمداً روشن نیست: ثبت در فهرست preload مرورگرها تعهدی برگشت‌ناپذیر است.
+builder.Services.AddHsts(options =>
+{
+    options.MaxAge = TimeSpan.FromDays(365);
+    options.IncludeSubDomains = true;
+});
+
 var app = builder.Build();
 
 // Forwarded Headers — باید اولین middleware باشد تا RemoteIpAddress واقعیِ کاربر
 // (پشت reverse proxy) برای Rate Limiter و لاگ در دسترس باشد.
 var forwardedHeadersOptions = new ForwardedHeadersOptions
 {
-    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost,
+    // تنها یک reverse proxy (Caddy) جلوی اپ است؛ پردازش بیش از یک حلقه، زنجیرهٔ جعلیِ
+    // X-Forwarded-For را می‌پذیرد. صریح ست می‌شود تا با تغییر پیش‌فرض‌ها عوض نشود.
+    ForwardLimit = 1
 };
 if (builder.Configuration.GetValue<bool>("ForwardedHeaders:TrustAllProxies"))
 {
@@ -117,10 +132,14 @@ app.UseHttpsRedirection();
 
 // endpointهای فایل‌های استاتیک. باید Map شود (نه فقط UseStaticFiles) تا مسیر
 // تک‌بخشی مثل /app.css یا /site.css با مسیر صفحهٔ پویای /{Slug} تداخل نکند.
-app.MapStaticAssets();
+// AllowAnonymous صریح: سیاست fallback سراسری ورود می‌خواهد و دارایی‌های عمومی
+// (CSS/JS/تصویر) باید بدون ورود سرو شوند، وگرنه سایت برای مهمان‌ها می‌شکند.
+app.MapStaticAssets().AllowAnonymous();
 
-// درخواست‌هایی که با هیچ صفحه‌ای مطابقت ندارند به صفحهٔ طراحی‌شدهٔ not-found هدایت می‌شوند.
-app.UseStatusCodePagesWithReExecute("/not-found", "?from={0}");
+// مسیرهای بی‌مطابقت را خودِ <Router> در Routes.razor به صفحهٔ ۴۰۴ طراحی‌شده می‌برد.
+// re-execute به /404 (یعنی UseStatusCodePagesWithReExecute) اینجا عمداً استفاده نشده:
+// endpoint رازر کامپوننت در همان درخواست دوبار اجرا می‌شود و با
+// InvalidOperationException: 'RemoteNavigationManager' already initialized پاسخ ۵۰۰ می‌دهد.
 
 // Antiforgery به هویت کاربر نیاز دارد، پس باید بعد از Authentication/Authorization بیاید
 app.UseAuthentication();
@@ -131,17 +150,30 @@ app.UseRateLimiter();
 // endpointهای پایه (احراز هویت و اعلان‌ها). endpoint دامنه بعد از این می‌آید.
 app.MapAshianebargh();
 app.MapSiteEndpoints();
-app.MapHealthChecks("/health");
+// سلامت عمومی است (بدون ورود) تا orchestrator بتواند آن را صدا بزند.
+app.MapHealthChecks("/health").AllowAnonymous();
 
 // مستندات خودکار API موبایل — فقط در Development (شامل کلید عمومی پوش و مسیرهای auth).
 // مرور JSON در: /openapi/v1.json
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.MapOpenApi().AllowAnonymous();
 }
 
 app.MapRazorComponents<Ashianebargh.App.Components.App>()
-    .AddInteractiveServerRenderMode();
+    .AddInteractiveServerRenderMode()
+    // مدار Blazor (/_blazor و negotiate/disconnect/initializers) باید برای مهمان‌ها
+    // باز بماند تا صفحه‌های عمومیِ InteractiveServer (مثل فرم تماس) کار کنند.
+    // این convention فقط endpointهای مدار را AllowAnonymous می‌کند، نه صفحه‌ها را؛
+    // صفحه‌های ادمین [Authorize] خودشان را دارند و مهمان‌ها با [AllowAnonymous] صفحه مشخص شده‌اند.
+    .Add(builder =>
+    {
+        if (builder is Microsoft.AspNetCore.Routing.RouteEndpointBuilder routeBuilder &&
+            routeBuilder.RoutePattern.RawText?.StartsWith("/_blazor", StringComparison.Ordinal) == true)
+        {
+            builder.Metadata.Add(new Microsoft.AspNetCore.Authorization.AllowAnonymousAttribute());
+        }
+    });
 
 try
 {

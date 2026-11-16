@@ -11,6 +11,9 @@ public interface ICategoryService
     Task<CategoryEditDto?> GetAsync(int id);
     Task<int> SaveAsync(CategoryEditDto dto);
     Task DeleteAsync(int id);
+
+    /// <summary>مسیر و تاریخ تغییر دسته‌های فعال برای sitemap.xml.</summary>
+    Task<List<SitemapEntryDto>> GetPublicSitemapAsync();
 }
 
 public sealed class CategoryService(IContentUnitOfWork uow) : ICategoryService
@@ -40,8 +43,14 @@ public sealed class CategoryService(IContentUnitOfWork uow) : ICategoryService
                     .FirstOrDefault()))
             .ToListAsync();
 
-    public Task<CategoryEditDto?> GetAsync(int id) =>
-        uow.Content.Categories
+    public Task<List<SitemapEntryDto>> GetPublicSitemapAsync() =>
+        uow.Content.Categories.AsNoTracking()
+            .Where(c => c.IsActive)
+            .OrderBy(c => c.SortOrder).ThenBy(c => c.Name)
+            .Select(c => new SitemapEntryDto("/category/" + c.Slug, c.UpdatedAt ?? c.CreatedAt))
+            .ToListAsync();
+
+    public Task<CategoryEditDto?> GetAsync(int id) =>        uow.Content.Categories
             .Where(c => c.Id == id)
             .Select(c => new CategoryEditDto
             {

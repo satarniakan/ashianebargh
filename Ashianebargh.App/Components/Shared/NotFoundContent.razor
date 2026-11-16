@@ -1,0 +1,37 @@
+@* بدنهٔ صفحهٔ ۴۰۴ عمومی — مشترک بین مسیر /404 و شاخهٔ NotFound روتر. *@
+@using Ashianebargh.App.Services
+@using Microsoft.AspNetCore.Http
+@inject SiteLanguage Language
+
+<div class="site-container">
+    <div class="site-empty site-empty--404">
+        <span class="site-404-code" aria-hidden="true">404</span>
+        <h1 class="site-404-title">@Language["notFound.title"]</h1>
+        <p>@Language["notFound.lead"]</p>
+
+        @if (!string.IsNullOrWhiteSpace(From))
+        {
+            <p class="site-404-path" dir="ltr">@From</p>
+        }
+
+        <div class="site-404-actions">
+            <a class="site-btn site-btn--red" href="/products">
+                <i class="bi bi-grid-3x3-gap"></i>
+                @Language["common.allProducts"]
+            </a>
+            <a class="site-btn site-btn--ghost site-btn--ghost-light" href="/">@Language["notFound.home"]</a>
+            <a class="site-btn site-btn--ghost site-btn--ghost-light" href="/contact">@Language["nav.contact"]</a>
+        </div>
+    </div>
+</div>
+
+@code {
+    /// <summary>مسیر درخواست‌شده (وقتی از طریق from= می‌آید) تا کاربر بداند کجا را زده است.</summary>
+    [Parameter] public string? From { get; set; }
+
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+
+    // هر جا این بدنه رندر شود یعنی پاسخ ۴۰۴ است؛ وضعیت همین‌جا ست می‌شود تا صفحات
+    // slug‌خورده (محصول/دسته/برگه) و روتر همه یک کد وضعیت واقعی داشته باشند.
+    protected override void OnInitialized() => NotFoundStatus.Mark(HttpContext?.Response);
+}

@@ -29,4 +29,19 @@
     <ProjectReference Include="..\Ashianebargh.App\Ashianebargh.App.csproj" />
   </ItemGroup>
 
+  <!-- فایل پیکربندی production برای تست رگرسیون سطح لاگ/محرمانه‌ها به خروجی تست کپی می‌شود
+       تا مستقل از مسیر build (artifacts-path) قابل خواندن باشد. -->
+  <ItemGroup>
+    <Content Include="..\Ashianebargh.App\appsettings.Production.json" Link="appsettings.Production.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- فایل‌های زنجیرهٔ تأمین/استقرار برای تست‌های رگرسیون سخت‌سازی (SupplyChainHardeningTests).
+         پروژهٔ ساخته‌شده از قالب، خودِ .template.config را ندارد (عمداً exclude شده)؛
+         پس ارجاع باید شرطی باشد وگرنه build پروژهٔ قالبی می‌شکند. -->
+    <Content Include="..\Directory.Packages.props" Link="Directory.Packages.props" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\NuGet.config" Link="NuGet.config" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\.github\workflows\ci.yml" Link="ci.yml" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\Ashianebargh.App\Dockerfile" Link="Dockerfile" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\.template.config\template.json" Link="template.json" CopyToOutputDirectory="PreserveNewest"
+             Condition="Exists('..\.template.config\template.json')" />
+  </ItemGroup>
+
 </Project>
