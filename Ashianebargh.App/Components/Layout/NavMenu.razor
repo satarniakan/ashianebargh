@@ -20,7 +20,9 @@
 <div class="nav-scrollable" onclick="if (event.target.closest('a.nav-link, button.nav-link')) { document.querySelector('.navbar-toggler').click(); }">
     <nav class="flex-column">
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="dashboard" Match="NavLinkMatch.All"><i class="bi bi-speedometer2"></i>داشبورد</NavLink>
+            @* داشبورد از NavProvider می‌آید؛ این لینک ثابت فقط بازگشت به سایت عمومی است.
+               Match=All وگرنه NavLink با href="/" روی همهٔ مسیرهای پنل «فعال» می‌شود. *@
+            <NavLink class="nav-link" href="/" Match="NavLinkMatch.All"><i class="bi bi-globe"></i>نمایش سایت</NavLink>
         </div>
 
         <AuthorizeView>

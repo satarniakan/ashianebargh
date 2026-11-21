@@ -31,6 +31,35 @@
                 </div>
             </div>
             <AppTextArea Label="توضیح" @bind-Value="model.Description" Rows="3" ShowCount />
+
+            <div class="mb-3">
+                <div class="form-label">تصویر دسته</div>
+                @if (!string.IsNullOrEmpty(ImagePreviewId))
+                {
+                    <img src="/files/site-products/category-image/@ImagePreviewId" alt="@model.Name"
+                         class="img-fluid rounded border mb-2 d-block category-image-preview" />
+                }
+                else
+                {
+                    <div class="text-body-secondary small mb-2">بدون تصویر اختصاصی، کارت دسته از تصویر اولین محصول یا آیکن استفاده می‌کند.</div>
+                }
+                <div class="d-flex flex-wrap gap-2">
+                    <label class="btn btn-sm btn-outline-primary mb-0" title="JPG، PNG یا WebP">
+                        <i class="bi bi-upload me-1"></i>انتخاب تصویر
+                        <InputFile accept=".jpg,.jpeg,.png,.webp,.gif" OnChange="UploadAsync" style="display:none;" />
+                    </label>
+                    @if (!string.IsNullOrEmpty(ImagePreviewId))
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-danger" @onclick="RemoveImageAsync">حذف تصویر</button>
+                    }
+                </div>
+                @if (uploading)
+                {
+                    <div class="form-text mt-2">در حال بارگذاری…</div>
+                }
+                <div class="form-text mt-2">تصویر مربع یا عریض (مثلاً ۸۰۰×۶۰۰) بهترین نتیجه را می‌دهد؛ حداکثر ۵ مگابایت.</div>
+            </div>
+
             <div class="row">
                 <div class="col-md-4">
                     <AppNumberField TValue="int" Label="ترتیب نمایش" @bind-Value="model.SortOrder" />
@@ -52,9 +81,14 @@
     [Parameter] public int Id { get; set; }
 
     private CategoryEditDto? model;
+    private string? pendingImageId;
     private bool saving;
+    private bool uploading;
+
+    private string? ImagePreviewId => pendingImageId ?? model?.ImageStorageId;
 
     [Inject] private ICategoryService Service { get; set; } = default!;
+    [Inject] private Ashianebargh.Domain.Interfaces.IFileStorage Storage { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private Ashianebargh.App.Services.ToastService ToastService { get; set; } = default!;
 
@@ -75,12 +109,75 @@
         }
     }
 
+    private async Task UploadAsync(InputFileChangeEventArgs e)
+    {
+        if (model is null) return;
+        uploading = true;
+        try
+        {
+            var file = e.File;
+            await using var stream = file.OpenReadStream(5 * 1024 * 1024);
+            var storageId = await Storage.SaveAsync(
+                ContentStorage.Owner, ContentStorage.CategoryImageType,
+                stream, file.Name, file.ContentType);
+
+            if (model.Id > 0)
+            {
+                // دستهٔ موجود: جایگزینی فوری تا فایل قبلی هم پاک شود
+                await Service.SetImageAsync(model.Id, storageId);
+                model.ImageStorageId = storageId;
+                pendingImageId = null;
+            }
+            else
+            {
+                // دستهٔ جدید: پس از ذخیره به آن وصل می‌شود
+                pendingImageId = storageId;
+            }
+
+            ToastService.ShowSuccess("تصویر بارگذاری شد.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError(ErrorMessageHelper.ToUserMessage(ex));
+        }
+        finally
+        {
+            uploading = false;
+        }
+    }
+
+    private async Task RemoveImageAsync()
+    {
+        if (model is null) return;
+        try
+        {
+            if (model.Id > 0)
+                await Service.SetImageAsync(model.Id, null);
+            else if (pendingImageId is not null)
+                await Storage.DeleteAsync(ContentStorage.Owner, ContentStorage.CategoryImageType, pendingImageId);
+
+            pendingImageId = null;
+            model.ImageStorageId = null;
+            ToastService.ShowSuccess("تصویر حذف شد.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError(ErrorMessageHelper.ToUserMessage(ex));
+        }
+    }
+
     private async Task SaveAsync()
     {
         saving = true;
         try
         {
-            await Service.SaveAsync(model!);
+            var id = await Service.SaveAsync(model!);
+            if (pendingImageId is not null)
+            {
+                await Service.SetImageAsync(id, pendingImageId);
+                pendingImageId = null;
+            }
+
             ToastService.ShowSuccess("دسته ذخیره شد.");
             Navigation.NavigateTo("/content/categories");
         }

@@ -37,10 +37,12 @@
                 </div>
             </div>
 
-            <AppTextArea Label="متن صفحه (فارسی)" @bind-Value="model.Content" Rows="14"
-                         Hint="متن ساده؛ خط‌های خالی به پاراگراف تبدیل می‌شوند." />
-            <AppTextArea Label="متن صفحه (انگلیسی)" @bind-Value="model.ContentEn" Rows="10"
-                         Hint="متن انگلیسی نمایشی وقتی زبان سایت انگلیسی است." />
+            <AppRichTextEditor Label="متن صفحه (فارسی)" @bind-Value="model.Content" Direction="rtl"
+                               Placeholder="متن صفحه را بنویسید…"
+                               Hint="قالب‌بندی (پررنگ، عنوان، فهرست، نقل‌قول و…) در سایت همان‌طور نمایش داده می‌شود." />
+            <AppRichTextEditor Label="متن صفحه (انگلیسی)" @bind-Value="model.ContentEn" Direction="ltr"
+                               Placeholder="English page content…"
+                               Hint="متن انگلیسی نمایشی وقتی زبان سایت انگلیسی است." />
 
             <div class="row">
                 <div class="col-md-4">

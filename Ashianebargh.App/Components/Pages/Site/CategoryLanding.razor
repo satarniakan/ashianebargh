@@ -11,8 +11,17 @@
 
 @if (category is null)
 {
-    <PageTitle>@Language["notFound.title"]</PageTitle>
-    <NotFoundContent From="@("/category/" + Slug)" />
+    @* چرا loading: رندر اولیهٔ SSR پیش از رسیدن داده انجام می‌شود؛ NotFoundContent
+       همان‌جا mount شود یعنی حتی برای دستهٔ موجودِ بعداً پیداشده ۴۰۴ (Soft-404). *@
+    if (loading)
+    {
+        <PageTitle>…</PageTitle>
+    }
+    else
+    {
+        <PageTitle>@Language["notFound.title"]</PageTitle>
+        <NotFoundContent From="@("/category/" + Slug)" />
+    }
 }
 else
 {
@@ -95,6 +104,7 @@ else
     private CategoryListItemDto? category;
     private List<CategoryListItemDto> categories = new();
     private PagedResult<ProductCardDto>? result;
+    private bool loading = true;
 
     private string SortKey =>
         ValidSorts.Contains(Sort ?? string.Empty, StringComparer.Ordinal) ? Sort ?? string.Empty : string.Empty;
@@ -106,12 +116,14 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
+        loading = true;
         categories = await CategoryService.GetActiveAsync();
         category = categories.FirstOrDefault(c => string.Equals(c.Slug, Slug, StringComparison.OrdinalIgnoreCase));
 
         if (category is null)
         {
             result = null;
+            loading = false;
             return;
         }
 
@@ -121,6 +133,7 @@ else
             Sort = SortKey,
             Page = PageNumber < 1 ? 1 : PageNumber
         });
+        loading = false;
     }
 
     private string ListUrl(string sort, int pageNumber)

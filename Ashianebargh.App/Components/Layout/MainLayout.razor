@@ -2,12 +2,13 @@
 @using Ashianebargh.App.Components.Shared
 @using Ashianebargh.App.Components.Layout
 
-@* دارایی‌های مخصوص پنل (تقویم شمسی و ورودی قیمت). عمداً اینجا هستند نه در App.razor،
-   تا صفحات عمومی سایت این اسکریپت/استایل اضافی را دانلود نکنند. *@
+@* دارایی‌های مخصوص پنل (تقویم شمسی). عمداً اینجا هستند نه در App.razor،
+   تا صفحات عمومی سایت این اسکریپت/استایل اضافی را دانلود نکنند.
+   priceInput.js اینجا نیست: ناوبری افزانه اسکریپت لایوت را اجرا نمی‌کند، پس
+   AppPriceField/AppNumberField آن را خودشان از راه PanelScriptLoader ماژولی می‌کنند. *@
 <link rel="stylesheet" href="/lib/datepicker/datepicker.min.css" />
 <script src="/lib/datepicker/datepicker.min.js"></script>
 <script src="/persian-datepicker-interop.js"></script>
-<script src="/priceInput.js"></script>
 
 <div class="page">
     <div class="sidebar">

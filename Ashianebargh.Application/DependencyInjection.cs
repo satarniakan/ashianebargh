@@ -42,6 +42,7 @@ public static class DependencyInjection
         services.AddScoped<IProductService, ProductService>();
         services.AddScoped<IPageService, PageService>();
         services.AddScoped<IContactService, ContactService>();
+        services.AddScoped<IHomeSliderService, HomeSliderService>();
 
         return services;
     }

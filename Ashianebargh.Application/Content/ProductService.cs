@@ -26,6 +26,9 @@ public interface IProductService
     /// <summary>افزودن تصویر گالری به محصول موجود.</summary>
     Task<ProductImageDto> AddImageAsync(int productId, Stream stream, string fileName);
 
+    /// <summary>وصل‌کردن تصویرِ آپلودشده در فضای ذخیره‌سازی به گالری (محصول نو، پیش از ذخیره).</summary>
+    Task<ProductImageDto> AttachImageAsync(int productId, string storageId);
+
     /// <summary>حذف تصویر گالری (ردیف و فایل فیزیکی).</summary>
     Task DeleteImageAsync(int imageId);
 
@@ -457,6 +460,32 @@ public sealed class ProductService(
 
         var storageId = await storage.SaveAsync(
             ContentStorage.Owner, ContentStorage.ProductImageType, stream, fileName, "image/*");
+
+        var nextOrder = await uow.Content.ProductImages
+            .Where(i => i.ProductId == productId)
+            .Select(i => (int?)i.SortOrder).MaxAsync() ?? -1;
+
+        var image = new ProductImage
+        {
+            ProductId = product.Id,
+            StorageId = storageId,
+            SortOrder = nextOrder + 1
+        };
+        uow.Content.Add(image);
+        await uow.CompleteAsync();
+
+        return new ProductImageDto(image.Id, image.StorageId);
+    }
+
+    public async Task<ProductImageDto> AttachImageAsync(int productId, string storageId)
+    {
+        var product = await uow.Content.Products.FirstOrDefaultAsync(p => p.Id == productId)
+            ?? throw new NotFoundException("محصول", productId);
+
+        // storageId جعلی/ناموجود نباید به ردیف گالری و مسیر رسانهٔ عمومی راه یابد.
+        if (string.IsNullOrWhiteSpace(storageId) ||
+            !await storage.ExistsAsync(ContentStorage.Owner, ContentStorage.ProductImageType, storageId))
+            throw new BusinessRuleException("فایل آپلودشده در فضای ذخیره‌سازی یافت نشد.");
 
         var nextOrder = await uow.Content.ProductImages
             .Where(i => i.ProductId == productId)

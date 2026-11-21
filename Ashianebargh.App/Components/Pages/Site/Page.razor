@@ -9,8 +9,17 @@
 
 @if (view is null)
 {
-    <PageTitle>@Language["page.notFoundTitle"]</PageTitle>
-    <NotFoundContent From="@("/" + Slug)" />
+    @* چرا loading: رندر اولیهٔ SSR پیش از رسیدن داده انجام می‌شود؛ اگر NotFoundContent
+       همان‌جا mount شود، حتی برای صفحهٔ موجودِ بعداً پیداشده ۴۰۴ می‌خورد (Soft-404). *@
+    if (loading)
+    {
+        <PageTitle>…</PageTitle>
+    }
+    else
+    {
+        <PageTitle>@Language["page.notFoundTitle"]</PageTitle>
+        <NotFoundContent From="@("/" + Slug)" />
+    }
 }
 else
 {
@@ -47,7 +56,7 @@ else
                     </figure>
                 }
                 <div class="content-panel">
-                    <ContentParagraphs Text="@Body" />
+                    <RichContent Text="@Body" />
                 </div>
             </div>
         }
@@ -58,6 +67,7 @@ else
     [Parameter] public string Slug { get; set; } = string.Empty;
 
     private PageViewDto? view;
+    private bool loading = true;
 
     private string Title => LocalizedText.Pick(Language.IsEnglish, view?.TitleEn, view?.Title);
 
@@ -91,6 +101,8 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
+        loading = true;
         view = await PageService.GetPublishedBySlugAsync(Slug);
+        loading = false;
     }
 }

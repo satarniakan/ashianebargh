@@ -12,8 +12,17 @@
 
 @if (product is null)
 {
-    <PageTitle>@Language["detail.notFoundTitle"]</PageTitle>
-    <NotFoundContent From="@("/product/" + Slug)" />
+    @* چرا loading: رندر اولیهٔ SSR پیش از رسیدن داده انجام می‌شود؛ NotFoundContent
+       همان‌جا mount شود یعنی حتی برای محصولِ موجودِ بعداً پیداشده ۴۰۴ (Soft-404). *@
+    if (loading)
+    {
+        <PageTitle>…</PageTitle>
+    }
+    else
+    {
+        <PageTitle>@Language["detail.notFoundTitle"]</PageTitle>
+        <NotFoundContent From="@("/product/" + Slug)" />
+    }
 }
 else
 {
@@ -182,7 +191,7 @@ else
                 {
                     <h2 class="site-subhead">@Language["detail.description"]</h2>
                     <div class="site-detail-desc">
-                        <ContentParagraphs Text="@DisplayDescription" />
+                        <RichContent Text="@DisplayDescription" />
                     </div>
                 }
 
@@ -235,6 +244,7 @@ else
     private List<ProductCardDto> related = new();
     private string safeDescription = string.Empty;
     private bool specsInDescription;
+    private bool loading = true;
 
     /// <summary>تصویر اصلی + گالری، به ترتیبی که کاربر می‌بیند.</summary>
     private readonly List<string> galleryImages = new();
@@ -249,8 +259,8 @@ else
 
     private string? DisplayDescription =>
         Language.IsEnglish && !string.IsNullOrWhiteSpace(product!.DescriptionEn)
-            ? HtmlContentSanitizer.Sanitize(product.DescriptionEn)
-            : safeDescription;
+            ? product.DescriptionEn
+            : product!.Description;
 
     private int SelectedImageIndex
     {
@@ -313,6 +323,7 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
+        loading = true;
         product = await ProductService.GetPublicBySlugAsync(Slug);
 
         if (product is null)
@@ -320,6 +331,7 @@ else
             categories = await CategoryService.GetActiveAsync();
             galleryImages.Clear();
             related.Clear();
+            loading = false;
             return;
         }
 
@@ -328,7 +340,7 @@ else
         // توضیحات پیش از رندر پالایش می‌شود (ضد XSS ذخیره‌شده). تفکیک جدول/متن
         // بر پایهٔ خروجیِ پالایش‌شده است نه پیشوندِ رشتهٔ خام؛ این فقط چیدمان است،
         // مرز امنیتی نیست چون پالایش مستقل انجام شده.
-        safeDescription = HtmlContentSanitizer.Sanitize(product.Description);
+        safeDescription = HtmlContentSanitizer.Sanitize(DisplayDescription ?? string.Empty);
         specsInDescription = safeDescription.Contains("<table", StringComparison.OrdinalIgnoreCase);
 
         galleryImages.Clear();
@@ -345,6 +357,7 @@ else
         }
 
         related = await ProductService.GetRelatedAsync(product.Id, product.CategorySlug, 4);
+        loading = false;
     }
 
     private static string StripHtml(string html)

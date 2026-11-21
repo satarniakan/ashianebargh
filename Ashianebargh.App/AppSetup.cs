@@ -20,6 +20,7 @@ public sealed class AppPermissionCatalog : IPermissionCatalog
         new(ContentPermissions.Categories, "مدیریت دسته‌بندی‌ها", "محتوا"),
         new(ContentPermissions.Tags, "مدیریت برچسب‌ها", "محتوا"),
         new(ContentPermissions.Pages, "مدیریت صفحات", "محتوا"),
+        new(ContentPermissions.Slider, "مدیریت اسلایدر صفحهٔ اول", "محتوا"),
         new(ContentPermissions.Contact, "مدیریت تماس با ما", "محتوا")
     ];
 }
@@ -35,6 +36,12 @@ public sealed class AppSettingCatalog : ISettingCatalog
     public IReadOnlyList<SettingDescriptor> All { get; } =
     [
         new(FrameworkSettingKeys.SiteName, "نام سامانه", "آشیانه برق", "عمومی"),
+        new(SliderSettingKeys.Transition, "انیمیشن تعویض اسلایدر (fade / slide / none)",
+            SliderSettingKeys.DefaultTransition, "اسلایدر"),
+        new(SliderSettingKeys.IntervalSeconds, "زمان نمایش هر اسلاید به ثانیه",
+            SliderSettingKeys.DefaultIntervalSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture), "اسلایدر"),
+        new(SliderSettingKeys.Enabled, "نمایش اسلایدر در صفحهٔ اول (true / false)",
+            "true", "اسلایدر"),
         new(FrameworkSettingKeys.OtpSmsTemplate, "قالب پیامک کد ورود ({Code})",
             SettingDefaults.Get(FrameworkSettingKeys.OtpSmsTemplate), "پیامک"),
 
@@ -79,6 +86,7 @@ public sealed class AppNavProvider : INavProvider
             NavItem.Link("دسته‌بندی‌ها", "content/categories", "bi-diagram-3", ContentPermissions.Categories),
             NavItem.Link("برچسب‌ها", "content/tags", "bi-tags", ContentPermissions.Tags),
             NavItem.Link("صفحات", "content/pages", "bi-file-earmark-text", ContentPermissions.Pages),
+            NavItem.Link("اسلایدر صفحهٔ اول", "content/slider", "bi-images", ContentPermissions.Slider),
             NavItem.Link("درباره ما", "content/about", "bi-info-circle", ContentPermissions.Pages),
             NavItem.Link("تماس با ما", "content/contact", "bi-telephone", ContentPermissions.Contact)),
 
@@ -126,6 +134,7 @@ public static class AppSetup
         // سیاست فایل با TryAdd تا پروژهٔ مصرف‌کننده بتواند قبل از/بعد از این پیش‌فرض را ثبت کند
         services.TryAddSingleton<IFileAccessPolicy, OwnerOrAdminFileAccessPolicy>();
         services.AddScoped<SiteLanguage>();
+        services.AddScoped<PanelScriptLoader>();
         return services;
     }
 }

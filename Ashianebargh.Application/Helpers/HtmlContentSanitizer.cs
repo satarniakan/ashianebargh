@@ -1,3 +1,5 @@
+using System.Text;
+using System.Text.RegularExpressions;
 using AngleSharp.Dom;
 using AngleSharp.Html.Parser;
 
@@ -14,8 +16,9 @@ namespace Ashianebargh.Application.Helpers;
 /// </para>
 /// <para>
 /// عناصر خطرناک (script/style/iframe/svg/math/…) به‌همراه زیردرختشان حذف می‌شوند؛
-/// عناصر ناشناختهٔ بی‌خطر «پوست‌کنده» می‌شوند تا متنشان بماند. صفات رویداد (on*)،
-/// <c>style</c> و <c>class</c> همیشه حذف؛ لینک/تصویر فقط با URL امنِ <see cref="SafeUrl"/>.
+/// عناصر ناشناختهٔ بی‌خطر «پوست‌کنده» می‌شوند تا متنشان بماند. صفات رویداد (on*) و
+/// <c>class</c> همیشه حذف؛ <c>style</c> فقط با ویژگی‌های امنِ فهرست‌سفید (رنگ/قلم/اندازه/
+/// تراز/تورفتگی/عرض — قالب‌بندی درون‌خطی Jodit)؛ لینک/تصویر فقط با URL امنِ <see cref="SafeUrl"/>.
 /// </para>
 /// </summary>
 public static class HtmlContentSanitizer
@@ -56,6 +59,33 @@ public static class HtmlContentSanitizer
     // صفات عمومیِ بی‌خطر (جهت/زبان برای متن راست‌چین).
     private static readonly HashSet<string> GlobalAttributes =
         new(StringComparer.OrdinalIgnoreCase) { "dir", "lang" };
+
+    // قالب‌بندی Jodit استایل درون‌خطی است؛ فقط این ویژگی‌ها با مقدارِ منطبق بر الگو می‌مانند.
+    // هر ویژگی الگوی سخت‌گیرانه دارد تا url(/expression/گریزِ CSS از آن رد نشود.
+    private static readonly Dictionary<string, Regex> AllowedStyleProperties =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["color"] = new Regex(@"^(#[0-9a-f]{3,8}|[a-z]{2,30}|(rgb|rgba|hsl|hsla)\([\d\s.,%+-]+\))$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
+            ["background-color"] = new Regex(@"^(#[0-9a-f]{3,8}|[a-z]{2,30}|(rgb|rgba|hsl|hsla)\([\d\s.,%+-]+\))$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
+            ["font-size"] = new Regex(@"^(\d{1,4}(\.\d+)?(px|em|rem|pt|%)|(xx-|x-)?(small|large)|medium|smaller|larger)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
+            ["font-family"] = new Regex(@"^[a-z0-9\s""',_-]+$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
+            ["text-align"] = new Regex("^(left|right|center|justify|start|end)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
+            ["margin-left"] = new Regex(@"^\d{1,4}(\.\d+)?px$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
+            ["margin-right"] = new Regex(@"^\d{1,4}(\.\d+)?px$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
+            ["width"] = new Regex(@"^\d{1,4}(\.\d+)?(px|%)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
+        };
+
+    /// <summary>
+    /// آیا متن شامل نشانه‌گذاری HTML است؟ مسیر رندر را بین «پاراگراف‌بندی خطی» (داده‌های
+    /// قدیمی متنی) و «رندر HTML پالایش‌شده» انتخاب می‌کند. مقایسهٔ ساده با <c>&lt;</c>
+    /// برای متن فارسی کافی است چون نویسهٔ عادیِ فارسی/لاتین هرگز با «&lt;+حرف» شروع نمی‌شود.
+    /// </summary>
+    public static bool ContainsMarkup(string? html)
+    {
+        if (string.IsNullOrWhiteSpace(html))
+            return false;
+        return System.Text.RegularExpressions.Regex.IsMatch(html, "<[a-zA-Z!/]");
+    }
 
     /// <summary>HTML پالایش‌شده و امن برای رندر؛ ورودی خالی → رشتهٔ خالی.</summary>
     public static string Sanitize(string? html)
@@ -119,6 +149,17 @@ public static class HtmlContentSanitizer
         foreach (var attribute in element.Attributes.ToArray())
         {
             var name = attribute.Name;
+
+            if (name is "style")
+            {
+                var safeStyle = SanitizeStyle(attribute.Value);
+                if (safeStyle.Length == 0)
+                    element.RemoveAttribute(name);
+                else
+                    element.SetAttribute(name, safeStyle);
+                continue;
+            }
+
             var allowed = GlobalAttributes.Contains(name) || (perTag?.Contains(name) ?? false);
             if (!allowed)
             {
@@ -135,6 +176,30 @@ public static class HtmlContentSanitizer
                     element.SetAttribute(name, safe);
             }
         }
+    }
+
+    private static string SanitizeStyle(string value)
+    {
+        var sb = new StringBuilder();
+        foreach (var declaration in value.Split(';'))
+        {
+            var colon = declaration.IndexOf(':');
+            if (colon <= 0)
+                continue;
+
+            var property = declaration[..colon].Trim();
+            if (!AllowedStyleProperties.TryGetValue(property, out var pattern))
+                continue;
+
+            var val = declaration[(colon + 1)..].Trim();
+            if (!pattern.IsMatch(val))
+                continue;
+
+            if (sb.Length > 0)
+                sb.Append(' ');
+            sb.Append(property.ToLowerInvariant()).Append(": ").Append(val).Append(';');
+        }
+        return sb.ToString();
     }
 
     private static string? SafeAttributeUrl(string? value)

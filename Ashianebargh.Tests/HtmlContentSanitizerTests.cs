@@ -16,6 +16,20 @@ public class HtmlContentSanitizerTests
         Assert.Equal(string.Empty, HtmlContentSanitizer.Sanitize("   "));
     }
 
+    [Theory]
+    [InlineData(null, false)]
+    [InlineData("", false)]
+    [InlineData("متن ساده فارسی با < بزرگ‌تر", false)] // < تک‌نویسهٔ متنی بدون تگ
+    [InlineData("3 < 5 و 6 > 2", false)]
+    [InlineData("<p>پاراگراف</p>", true)]
+    [InlineData("<strong>پررنگ</strong>", true)]
+    [InlineData("<br>", true)]
+    [InlineData("<!-- comment -->متن", true)]
+    public void ContainsMarkup_DetectsTagsOnly(string? input, bool expected)
+    {
+        Assert.Equal(expected, HtmlContentSanitizer.ContainsMarkup(input));
+    }
+
     [Fact]
     public void Sanitize_RemovesScriptElement_ButKeepsTable()
     {
@@ -84,13 +98,67 @@ public class HtmlContentSanitizerTests
     }
 
     [Fact]
-    public void Sanitize_RemovesStyleAndClassAttributes()
+    public void Sanitize_RemovesClassAndUnsafeStyle_KeepsSafeColor()
     {
         var result = HtmlContentSanitizer.Sanitize(
             "<table class=\"x\" style=\"background:url(javascript:alert(1))\"><tr><td style=\"color:red\">x</td></tr></table>");
 
-        Assert.DoesNotContain("style=", result, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("class=", result, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("url(", result, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("javascript:", result, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("color: red;", result);
+    }
+
+    [Fact]
+    public void Sanitize_KeepsJoditFormattingStyles()
+    {
+        // قالب‌بندی درون‌خطی Jodit: رنگ/پس‌زمینه/قلم/اندازه/تراز/تورفتگی/عرض
+        var result = HtmlContentSanitizer.Sanitize(
+            "<p style=\"text-align: center;\"><span style=\"color: #ff0000; background-color: rgb(0, 0, 255); " +
+            "font-size: 18px; font-family: 'Times New Roman', serif;\">متن</span></p>" +
+            "<p style=\"margin-right: 20px;\">تورفته</p><table><tr><td style=\"width: 50%;\">x</td></tr></table>");
+
+        Assert.Contains("text-align: center;", result);
+        Assert.Contains("color: #ff0000;", result);
+        Assert.Contains("background-color: rgb(0, 0, 255);", result);
+        Assert.Contains("font-size: 18px;", result);
+        Assert.Contains("font-family: 'Times New Roman', serif;", result);
+        Assert.Contains("margin-right: 20px;", result);
+        Assert.Contains("width: 50%;", result);
+    }
+
+    [Theory]
+    [InlineData("position: fixed; top: 0")] // ویژگی خارج از فهرست‌سفید
+    [InlineData("background-color: url(javascript:alert(1))")]
+    [InlineData("color: expression(alert(1))")]
+    [InlineData("width: 100vw")] // واحد غیرمجاز
+    [InlineData("font-size: 12")] // بدون واحد
+    [InlineData("text-align: evil")]
+    [InlineData(@"color: r\65 d")] // گریز CSS
+    [InlineData("color: red /* comment */")]
+    public void Sanitize_DropsUnsafeStyleDeclarations(string style)
+    {
+        var result = HtmlContentSanitizer.Sanitize($"<p style=\"{style}\">x</p>");
+
+        Assert.DoesNotContain("style=", result, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("x", result);
+    }
+
+    [Fact]
+    public void Sanitize_KeepsSafeDeclarations_WhenMixedWithUnsafe()
+    {
+        var result = HtmlContentSanitizer.Sanitize(
+            "<p style=\"color: blue; position: absolute; z-index: 9999;\">x</p>" +
+            "<p style=\"color: red; behavior: url(evil.htc);\">y</p>" +
+            "<p style=\"font-family: a; src: url(x);\">z</p>");
+
+        Assert.Contains("color: blue;", result);
+        Assert.Contains("color: red;", result);
+        Assert.Contains("font-family: a;", result);
+        Assert.DoesNotContain("position", result, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("z-index", result, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("behavior", result, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("url(", result, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

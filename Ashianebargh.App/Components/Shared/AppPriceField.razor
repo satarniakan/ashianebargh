@@ -6,6 +6,7 @@
 @using System.Text
 @using Ashianebargh.Application.Helpers
 @inject IJSRuntime JS
+@inject Ashianebargh.App.Services.PanelScriptLoader PanelScripts
 @typeparam TValue where TValue : struct, INumber<TValue>
 
 <div class="@WrapperClass">
@@ -101,7 +102,11 @@
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender && !Disabled)
+        {
+            // در ناوبری افزانه از سایت به پنل اسکریپت لایوت اجرا نشده؛ ماژول را همین‌جا تضمین کن.
+            await PanelScripts.PriceInputAsync();
             await JS.InvokeVoidAsync("priceInput.attach", InputElement);
+        }
     }
 
     private async Task HandleInput(ChangeEventArgs e)

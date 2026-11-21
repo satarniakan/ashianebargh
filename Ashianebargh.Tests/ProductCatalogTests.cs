@@ -1,4 +1,5 @@
 using System.Text;
+using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
@@ -160,6 +161,32 @@ public class ProductCatalogTests
         Assert.Equal("Linear Light", details!.NameEn);
         Assert.Equal(["توان", "دمای رنگ"], details.Specs.Select(s => s.Title));
         Assert.Equal("۳۶ وات", details.Specs[0].Value);
+    }
+
+    [Fact]
+    public async Task SaveAsync_LongDescriptions_PassValidationAndPersist()
+    {
+        var (db, uow, storage) = Build();
+        await using var _ = db;
+        var category = await SeedCategoryAsync(db, "روشنایی", "lighting");
+        var service = Service(uow, storage);
+
+        // ستون توضیحات nvarchar(max) است و خروجی HTML ادیتور به‌راحتی از ۱۰۰۰ نویسه می‌گذرد؛
+        // محدودیت StringLength روی dto نباید برگردد.
+        var dto = new ProductEditDto
+        {
+            Name = "محصول توضیح‌بلند",
+            CategoryId = category.Id,
+            Slug = "long-description",
+            Description = new string('ت', 5000),
+            DescriptionEn = new string('x', 5000)
+        };
+        Assert.True(Validator.TryValidateObject(dto, new ValidationContext(dto), new List<ValidationResult>(), true));
+
+        var id = await service.SaveAsync(dto);
+        var edit = await service.GetForEditAsync(id);
+        Assert.Equal(5000, edit!.Description!.Length);
+        Assert.Equal(5000, edit.DescriptionEn!.Length);
     }
 
     [Fact]

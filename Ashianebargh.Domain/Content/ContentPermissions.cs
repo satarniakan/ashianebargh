@@ -8,4 +8,5 @@ public static class ContentPermissions
     public const string Tags = "content.tags.manage";
     public const string Pages = "content.pages.manage";
     public const string Contact = "content.contact.manage";
+    public const string Slider = "content.slider.manage";
 }

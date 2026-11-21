@@ -1,0 +1,193 @@
+@page "/content/slider/new"
+@page "/content/slider/{Id:int}"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = Ashianebargh.Domain.Content.ContentPermissions.Slider)]
+@using Microsoft.AspNetCore.Authorization
+@using Ashianebargh.Application.Content
+@using Ashianebargh.Domain.Content
+@using Ashianebargh.Domain.Interfaces
+<PageTitle>@(Id > 0 ? "ویرایش اسلاید" : "اسلاید جدید")</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">@(Id > 0 ? "ویرایش اسلاید" : "اسلاید جدید")</h3>
+    <a href="/content/slider" class="btn btn-sm btn-outline-secondary">بازگشت به فهرست</a>
+</div>
+
+@if (model is null)
+{
+    <div class="card-panel"><LoadingSkeleton /></div>
+}
+else
+{
+    <EditForm Model="model" OnValidSubmit="SaveAsync">
+        <DataAnnotationsValidator />
+        <div class="row g-3">
+            <div class="col-lg-8">
+                <div class="card-panel">
+                    <AppTextField Label="متن روی اسلاید (فارسی)" @bind-Value="model.Title"
+                                  Hint="اختیاری؛ خالی بماند، اسلاید فقط با تصویر نمایش داده می‌شود." />
+                    <AppTextField Label="متن روی اسلاید (انگلیسی)" @bind-Value="model.TitleEn"
+                                  Hint="خالی بماند، سایت در حالت انگلیسی همان متن فارسی را نشان می‌دهد." />
+                </div>
+
+                <div class="card-panel mt-3">
+                    <h5 class="mb-3">تصویر اسلاید</h5>
+                    @if (!string.IsNullOrEmpty(ImagePreviewId))
+                    {
+                        <img src="/files/site-products/slider-image/@ImagePreviewId" alt="@(model.Title ?? string.Empty)"
+                             class="img-fluid rounded border mb-3 slider-image-preview" />
+                    }
+                    else
+                    {
+                        <div class="text-body-secondary small mb-3">تصویری انتخاب نشده است؛ اسلاید بدون تصویر در سایت نمایش داده نمی‌شود.</div>
+                    }
+                    <div class="d-flex flex-wrap gap-2">
+                        <label class="btn btn-sm btn-outline-primary mb-0" title="JPG، PNG یا WebP">
+                            <i class="bi bi-upload me-1"></i>انتخاب تصویر
+                            <InputFile accept=".jpg,.jpeg,.png,.webp,.gif" OnChange="UploadAsync" style="display:none;" />
+                        </label>
+                        @if (!string.IsNullOrEmpty(ImagePreviewId))
+                        {
+                            <button type="button" class="btn btn-sm btn-outline-danger" @onclick="RemoveImageAsync">حذف تصویر</button>
+                        }
+                    </div>
+                    @if (uploading)
+                    {
+                        <div class="form-text mt-2">در حال بارگذاری…</div>
+                    }
+                    <div class="form-text mt-2">تصویر عریض (مثلاً ۱۶۰۰×۶۰۰) بهترین نتیجه را می‌دهد؛ حداکثر ۵ مگابایت.</div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card-panel">
+                    <AppNumberField TValue="int" Label="ترتیب نمایش" @bind-Value="model.SortOrder" />
+                    <AppCheckbox Label="فعال (در صفحهٔ اول دیده شود)" @bind-Value="model.IsActive" />
+                </div>
+
+                <div class="card-panel mt-3">
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary" disabled="@saving">@(saving ? "در حال ذخیره…" : "ذخیره")</button>
+                        <a href="/content/slider" class="btn btn-outline-secondary">انصراف</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private HomeSlideEditDto? model;
+    private string? pendingImageId;
+    private bool saving;
+    private bool uploading;
+
+    private string? ImagePreviewId => pendingImageId ?? model?.ImageStorageId;
+
+    [Inject] private IHomeSliderService Service { get; set; } = default!;
+    [Inject] private IFileStorage Storage { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private Ashianebargh.App.Services.ToastService ToastService { get; set; } = default!;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Id > 0)
+        {
+            model = await Service.GetAsync(Id);
+            if (model is null)
+            {
+                ToastService.ShowError("اسلاید یافت نشد.");
+                Navigation.NavigateTo("/content/slider");
+            }
+        }
+        else
+        {
+            model = new HomeSlideEditDto();
+        }
+    }
+
+    private async Task UploadAsync(InputFileChangeEventArgs e)
+    {
+        if (model is null) return;
+        uploading = true;
+        try
+        {
+            var file = e.File;
+            await using var stream = file.OpenReadStream(5 * 1024 * 1024);
+            var storageId = await Storage.SaveAsync(
+                ContentStorage.Owner, ContentStorage.SliderImageType,
+                stream, file.Name, file.ContentType);
+
+            if (model.Id > 0)
+            {
+                // اسلاید موجود: جایگزینی فوری تا فایل قبلی هم پاک شود
+                await Service.SetImageAsync(model.Id, storageId);
+                model.ImageStorageId = storageId;
+                pendingImageId = null;
+            }
+            else
+            {
+                // اسلاید جدید: پس از ذخیره به آن وصل می‌شود
+                pendingImageId = storageId;
+            }
+
+            ToastService.ShowSuccess("تصویر بارگذاری شد.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError(ErrorMessageHelper.ToUserMessage(ex));
+        }
+        finally
+        {
+            uploading = false;
+        }
+    }
+
+    private async Task RemoveImageAsync()
+    {
+        if (model is null) return;
+        try
+        {
+            if (model.Id > 0)
+                await Service.SetImageAsync(model.Id, null);
+            else if (pendingImageId is not null)
+                await Storage.DeleteAsync(ContentStorage.Owner, ContentStorage.SliderImageType, pendingImageId);
+
+            pendingImageId = null;
+            model.ImageStorageId = null;
+            ToastService.ShowSuccess("تصویر حذف شد.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError(ErrorMessageHelper.ToUserMessage(ex));
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (model is null) return;
+        saving = true;
+        try
+        {
+            var id = await Service.SaveAsync(model);
+            if (pendingImageId is not null)
+            {
+                await Service.SetImageAsync(id, pendingImageId);
+                pendingImageId = null;
+            }
+
+            ToastService.ShowSuccess("اسلاید ذخیره شد.");
+            Navigation.NavigateTo("/content/slider");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError(ErrorMessageHelper.ToUserMessage(ex));
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+}

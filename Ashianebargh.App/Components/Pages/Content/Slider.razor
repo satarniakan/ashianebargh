@@ -1,0 +1,171 @@
+@page "/content/slider"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = Ashianebargh.Domain.Content.ContentPermissions.Slider)]
+@using Microsoft.AspNetCore.Authorization
+@using Ashianebargh.Application.Content
+@using Ashianebargh.Domain.Content
+<PageTitle>اسلایدر صفحهٔ اول</PageTitle>
+
+<div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
+    <div>
+        <h3 class="mb-1">اسلایدر صفحهٔ اول</h3>
+        <div class="text-body-secondary small">تصویر و متن هر اسلاید از همین‌جا مدیریت می‌شود؛ اسلایدهای فعال به ترتیب نمایش در صفحهٔ اول می‌چرخند.</div>
+    </div>
+    <a href="/content/slider/new" class="btn btn-primary btn-sm">اسلاید جدید</a>
+</div>
+
+<div class="card-panel mb-3">
+    <h5 class="mb-3">تنظیمات نمایش</h5>
+    @if (settings is null)
+    {
+        <LoadingSkeleton />
+    }
+    else
+    {
+        <div class="row g-3 align-items-end">
+            <div class="col-12">
+                <AppCheckbox Label="اسلایدر در صفحهٔ اول نمایش داده شود" @bind-Value="settings.Enabled" />
+            </div>
+            <div class="col-md-4">
+                <AppDropdown TValue="string" Label="انیمیشن هنگام تعویض اسلاید" @bind-Value="settings.Transition">
+                    <option value="fade">محو شدن (fade)</option>
+                    <option value="slide">کشویی (slide)</option>
+                    <option value="none">بدون انیمیشن</option>
+                </AppDropdown>
+            </div>
+            <div class="col-md-4">
+                <AppNumberField TValue="int" Label="زمان نمایش هر اسلاید (ثانیه)" @bind-Value="settings.IntervalSeconds" />
+            </div>
+            <div class="col-md-4">
+                <button type="button" class="btn btn-outline-primary" disabled="@savingSettings" @onclick="SaveSettingsAsync">
+                    @(savingSettings ? "در حال ذخیره…" : "ذخیره تنظیمات")
+                </button>
+            </div>
+        </div>
+        <div class="form-text mt-2">زمان نمایش بین ۲ تا ۶۰ ثانیه است. اگر تیک نمایش برداشته شود یا هیچ اسلاید فعالی نباشد، همان بخش معرفی فعلی صفحهٔ اول نمایش داده می‌شود.</div>
+    }
+</div>
+
+<div class="card-panel">
+    @if (items is null)
+    {
+        <LoadingSkeleton />
+    }
+    else if (items.Count == 0)
+    {
+        <div class="text-center text-body-secondary py-4">
+            <i class="bi bi-images fs-3 d-block mb-2"></i>
+            <span class="small">هنوز اسلایدی ساخته نشده است.</span>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th>تصویر</th>
+                        <th>متن (فارسی)</th>
+                        <th>متن (انگلیسی)</th>
+                        <th>وضعیت</th>
+                        <th>ترتیب</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in items)
+                    {
+                        <tr>
+                            <td>
+                                @if (!string.IsNullOrEmpty(item.ImageStorageId))
+                                {
+                                    <img src="/files/site-products/slider-image/@item.ImageStorageId" alt=""
+                                         width="96" height="54" class="rounded border" style="object-fit: cover;" loading="lazy" />
+                                }
+                                else
+                                {
+                                    <span class="text-body-secondary small">بدون تصویر</span>
+                                }
+                            </td>
+                            <td>@(string.IsNullOrEmpty(item.Title) ? "بدون متن" : item.Title)</td>
+                            <td>@item.TitleEn</td>
+                            <td>
+                                @if (item.IsActive)
+                                {
+                                    <span class="badge text-bg-success">فعال</span>
+                                }
+                                else
+                                {
+                                    <span class="badge text-bg-secondary">غیرفعال</span>
+                                }
+                            </td>
+                            <td>@item.SortOrder</td>
+                            <td class="text-end">
+                                <div class="d-inline-flex gap-1">
+                                    <a href="/content/slider/@item.Id" class="btn btn-sm btn-outline-primary">ویرایش</a>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => AskDelete(item)">حذف</button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<AppConfirmDialog @ref="confirmDialog" />
+
+@code {
+    private List<HomeSlideListItemDto>? items;
+    private HomeSliderSettingsDto? settings;
+    private bool savingSettings;
+    private AppConfirmDialog confirmDialog = default!;
+
+    [Inject] private IHomeSliderService Service { get; set; } = default!;
+    [Inject] private Ashianebargh.App.Services.ToastService ToastService { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        items = await Service.GetAllAsync();
+        settings = await Service.GetSettingsAsync();
+    }
+
+    private async Task SaveSettingsAsync()
+    {
+        if (settings is null) return;
+        savingSettings = true;
+        try
+        {
+            await Service.SaveSettingsAsync(settings);
+            ToastService.ShowSuccess("تنظیمات اسلایدر ذخیره شد.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError(ErrorMessageHelper.ToUserMessage(ex));
+        }
+        finally
+        {
+            savingSettings = false;
+        }
+    }
+
+    private async Task AskDelete(HomeSlideListItemDto item)
+    {
+        var confirmed = await confirmDialog.ShowAsync(
+            "حذف اسلاید",
+            $"اسلاید «{(string.IsNullOrEmpty(item.Title) ? "بدون متن" : item.Title)}» حذف شود؟");
+        if (!confirmed) return;
+
+        try
+        {
+            await Service.DeleteAsync(item.Id);
+            ToastService.ShowSuccess("اسلاید حذف شد.");
+            items = await Service.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError(ErrorMessageHelper.ToUserMessage(ex));
+        }
+    }
+}

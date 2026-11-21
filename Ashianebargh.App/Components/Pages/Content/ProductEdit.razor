@@ -36,7 +36,9 @@ else
                                   Hint="خالی بگذارید تا از نام ساخته شود. باید یکتا باشد." />
                     <AppTextArea Label="توضیح کوتاه (کارت محصول)" @bind-Value="model.ShortDescription"
                                  Rows="2" ShowCount />
-                    <AppTextArea Label="توضیحات کامل" @bind-Value="model.Description" Rows="8" />
+                    <AppRichTextEditor Label="توضیحات کامل" @bind-Value="model.Description" Direction="rtl"
+                                       Placeholder="توضیحات محصول را بنویسید…"
+                                       Hint="قالب‌بندی (پررنگ، عنوان، فهرست، جدول و…) در سایت همان‌طور نمایش داده می‌شود." />
                 </div>
 
                 <div class="card-panel mt-3">
@@ -47,7 +49,9 @@ else
                     <AppTextField Label="نام محصول (انگلیسی)" @bind-Value="model.NameEn" />
                     <AppTextArea Label="توضیح کوتاه (انگلیسی)" @bind-Value="model.ShortDescriptionEn"
                                  Rows="2" ShowCount />
-                    <AppTextArea Label="توضیحات کامل (انگلیسی)" @bind-Value="model.DescriptionEn" Rows="8" />
+                    <AppRichTextEditor Label="توضیحات کامل (انگلیسی)" @bind-Value="model.DescriptionEn" Direction="ltr"
+                                       Placeholder="English product description…"
+                                       Hint="متن انگلیسی نمایشی وقتی زبان سایت انگلیسی است." />
                 </div>
 
                 <div class="card-panel mt-3">
@@ -138,7 +142,7 @@ else
                     <h5 class="mb-3">تصویر اصلی</h5>
                     @if (!string.IsNullOrEmpty(ImagePreviewId))
                     {
-                        <img src="/media/products/@ImagePreviewId" alt="@model.Name"
+                        <img src="/files/site-products/product-image/@ImagePreviewId" alt="@model.Name"
                              class="product-image-preview mb-3" />
                     }
                     else
@@ -163,7 +167,7 @@ else
 
                 <div class="card-panel mt-3">
                     <h5 class="mb-3">گالری تصاویر</h5>
-                    @if (model.Images.Count == 0)
+                    @if (model.Images.Count == 0 && pendingGallery.Count == 0)
                     {
                         <div class="text-body-secondary small mb-3">تصویر دیگری در گالری نیست.</div>
                     }
@@ -173,7 +177,7 @@ else
                             @foreach (var image in model.Images)
                             {
                                 <div class="position-relative">
-                                    <img src="/media/products/@image.StorageId" alt="" width="72" height="72"
+                                    <img src="/files/site-products/product-image/@image.StorageId" alt="" width="72" height="72"
                                          class="rounded border" style="object-fit: cover;" loading="lazy" />
                                     <button type="button"
                                             class="btn btn-sm btn-outline-danger position-absolute top-0 end-0 m-1 py-0 px-1"
@@ -182,23 +186,35 @@ else
                                     </button>
                                 </div>
                             }
+                            @foreach (var pending in pendingGallery)
+                            {
+                                <div class="position-relative">
+                                    <img src="/files/site-products/product-image/@pending.StorageId" alt="" width="72" height="72"
+                                         class="rounded border" style="object-fit: cover;" loading="lazy" />
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-danger position-absolute top-0 end-0 m-1 py-0 px-1"
+                                            title="حذف تصویر" @onclick="() => RemovePendingGalleryAsync(pending.StorageId)">
+                                        <i class="bi bi-x"></i>
+                                    </button>
+                                </div>
+                            }
                         </div>
                     }
-                    @if (model.Id > 0)
+                    <label class="btn btn-sm btn-outline-primary mb-0" title="JPG، PNG یا WebP">
+                        <i class="bi bi-upload me-1"></i>افزودن تصویر
+                        <InputFile accept=".jpg,.jpeg,.png,.webp,.gif" multiple OnChange="UploadGalleryAsync" style="display:none;" />
+                    </label>
+                    @if (uploadingGallery)
                     {
-                        <label class="btn btn-sm btn-outline-primary mb-0" title="JPG، PNG یا WebP">
-                            <i class="bi bi-upload me-1"></i>افزودن تصویر
-                            <InputFile accept=".jpg,.jpeg,.png,.webp,.gif" OnChange="UploadGalleryAsync" style="display:none;" />
-                        </label>
-                        @if (uploadingGallery)
+                        <div class="form-text mt-2">در حال بارگذاری…</div>
+                    }
+                    <div class="form-text mt-2">
+                        می‌توانید چند تصویر را یک‌جا انتخاب کنید (هر بار حداکثر ۱۰ تصویر، هر تصویر حداکثر ۵ مگابایت).
+                        @if (model.Id == 0)
                         {
-                            <div class="form-text mt-2">در حال بارگذاری…</div>
+                            <text> تصاویر گالری پس از ذخیرهٔ محصول به آن وصل می‌شوند.</text>
                         }
-                    }
-                    else
-                    {
-                        <div class="text-body-secondary small">پس از ذخیرهٔ محصول می‌توانید تصاویر گالری را اضافه کنید.</div>
-                    }
+                    </div>
                 </div>
 
                 <div class="card-panel mt-3">
@@ -256,12 +272,15 @@ else
     private List<TagListItemDto> tags = new();
     private string? pendingImageId;
     private readonly List<PendingFile> pendingFiles = new();
+    private readonly List<PendingFile> pendingGallery = new();
     private bool saving;
     private bool uploading;
     private bool uploadingFile;
     private bool uploadingGallery;
 
     private sealed record PendingFile(string StorageId, string FileName, string ContentType, long SizeBytes);
+
+    private const int MaxGalleryBatch = 10;
 
     private string? ImagePreviewId => pendingImageId ?? model?.MainImageStorageId;
 
@@ -324,15 +343,39 @@ else
 
     private async Task UploadGalleryAsync(InputFileChangeEventArgs e)
     {
-        if (model is null || model.Id <= 0) return;
+        if (model is null) return;
+        if (e.FileCount > MaxGalleryBatch)
+        {
+            ToastService.ShowError($"در هر بار انتخاب حداکثر {MaxGalleryBatch} تصویر مجاز است.");
+            return;
+        }
+
         uploadingGallery = true;
         try
         {
-            var file = e.File;
-            await using var stream = file.OpenReadStream(5 * 1024 * 1024);
-            var dto = await Service.AddImageAsync(model.Id, stream, file.Name);
-            model.Images.Add(dto);
-            ToastService.ShowSuccess("تصویر به گالری اضافه شد.");
+            var added = 0;
+            foreach (var file in e.GetMultipleFiles(MaxGalleryBatch))
+            {
+                await using var stream = file.OpenReadStream(5 * 1024 * 1024);
+                if (model.Id > 0)
+                {
+                    var dto = await Service.AddImageAsync(model.Id, stream, file.Name);
+                    model.Images.Add(dto);
+                }
+                else
+                {
+                    // محصول جدید: تصویر در فضای ذخیره‌سازی می‌نشیند و بعد از ذخیره وصل می‌شود
+                    var storageId = await Storage.SaveAsync(
+                        ContentStorage.Owner, ContentStorage.ProductImageType,
+                        stream, file.Name, file.ContentType);
+                    pendingGallery.Add(new PendingFile(storageId, file.Name, file.ContentType, file.Size));
+                }
+                added++;
+            }
+
+            ToastService.ShowSuccess(added == 1
+                ? "تصویر به گالری اضافه شد."
+                : $"{added} تصویر به گالری اضافه شد.");
         }
         catch (Exception ex)
         {
@@ -341,6 +384,22 @@ else
         finally
         {
             uploadingGallery = false;
+        }
+    }
+
+    private async Task RemovePendingGalleryAsync(string storageId)
+    {
+        var pending = pendingGallery.FirstOrDefault(f => f.StorageId == storageId);
+        if (pending is null) return;
+
+        pendingGallery.RemoveAll(f => f.StorageId == storageId);
+        try
+        {
+            await Storage.DeleteAsync(ContentStorage.Owner, ContentStorage.ProductImageType, storageId);
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError(ErrorMessageHelper.ToUserMessage(ex));
         }
     }
 
@@ -500,6 +559,10 @@ else
                     pending.ContentType, pending.SizeBytes);
             }
             pendingFiles.Clear();
+
+            foreach (var pending in pendingGallery)
+                await Service.AttachImageAsync(id, pending.StorageId);
+            pendingGallery.Clear();
 
             ToastService.ShowSuccess("محصول ذخیره شد.");
             Navigation.NavigateTo("/content/products");

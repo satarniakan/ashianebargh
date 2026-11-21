@@ -12,6 +12,7 @@ public sealed class ContentRepository(AshianebarghDbContext context) : IContentR
     public IQueryable<ProductSpec> ProductSpecs => context.Set<ProductSpec>();
     public IQueryable<ProductImage> ProductImages => context.Set<ProductImage>();
     public IQueryable<Page> Pages => context.Set<Page>();
+    public IQueryable<HomeSlide> HomeSlides => context.Set<HomeSlide>();
     public IQueryable<ContactInfo> ContactInfos => context.Set<ContactInfo>();
     public IQueryable<ContactMessage> ContactMessages => context.Set<ContactMessage>();
 

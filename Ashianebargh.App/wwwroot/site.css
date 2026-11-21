@@ -199,6 +199,8 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
         min-height: 86px;
         flex-wrap: wrap;
         row-gap: 6px;
+        /* سطر اول (لوگو/جست‌وجو/دکمه‌ها) بدون این فاصله به لبهٔ بالای صفحه می‌چسبد. */
+        padding-top: 10px;
         padding-bottom: 24px;
     }
 
@@ -378,7 +380,7 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     font-weight: 600;
     white-space: nowrap;
     flex-shrink: 0;
-    transition: background 0.18s ease, color 0.18s ease;
+    transition: background 0.25s ease, color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
 }
 
 .site-cta i {
@@ -570,6 +572,181 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
 
 /* ---------- ظ†ظˆط§ط± ظ…ط²غŒطھâ€Œظ‡ط§ ---------- */
 
+/* ---------- اسلایدر صفحهٔ اول ---------- */
+
+.site-slider {
+    position: relative;
+    overflow: hidden;
+    background: var(--site-dark);
+    border-radius: 0 0 var(--radius) var(--radius);
+}
+
+.site-slider-track {
+    position: relative;
+    aspect-ratio: 16 / 6;
+    min-height: 280px;
+    max-height: 560px;
+}
+
+.site-slide {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.7s ease, visibility 0.7s;
+}
+
+.site-slide.is-active {
+    opacity: 1;
+    visibility: visible;
+    z-index: 1;
+}
+
+.site-slide > img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* scrim تا متن روی هر تصویری خوانا بماند؛ اسلاید فقط‌تصویر scrim نمی‌گیرد */
+.site-slide.has-caption::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(4, 16, 32, 0.78), rgba(4, 16, 32, 0.15) 55%, transparent);
+}
+
+.site-slide-caption {
+    position: absolute;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 2;
+    padding: 28px 48px 56px;
+    color: #fff;
+}
+
+.site-slide-caption h2 {
+    margin: 0;
+    max-width: 60ch;
+    font-size: clamp(1.25rem, 2.6vw, 2.25rem);
+    font-weight: 800;
+    line-height: 1.6;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+}
+
+/* حالت کشویی: اسلایدها کنار هم می‌نشینند و ترک جابه‌جا می‌شود */
+.site-slider[data-transition="slide"] .site-slider-track {
+    display: flex;
+    aspect-ratio: auto;
+    height: clamp(280px, 34vw, 560px);
+    transition: transform 0.7s ease;
+}
+
+.site-slider[data-transition="slide"] .site-slide {
+    position: relative;
+    flex: 0 0 100%;
+    opacity: 1;
+    visibility: visible;
+    transition: none;
+}
+
+.site-slider[data-transition="none"] .site-slide {
+    transition: none;
+}
+
+.site-slider-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 3;
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(4, 16, 32, 0.55);
+    color: #fff;
+    font-size: 20px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.site-slider-btn:hover {
+    background: rgba(4, 16, 32, 0.8);
+}
+
+.site-slider-prev {
+    inset-inline-start: 16px;
+}
+
+.site-slider-next {
+    inset-inline-end: 16px;
+}
+
+.site-slider-dots {
+    position: absolute;
+    inset-inline: 0;
+    bottom: 16px;
+    z-index: 3;
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+}
+
+.site-slider-dot {
+    width: 10px;
+    height: 10px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.45);
+    cursor: pointer;
+    transition: background 0.2s, transform 0.2s;
+}
+
+.site-slider-dot.is-active {
+    background: #fff;
+    transform: scale(1.25);
+}
+
+@media (max-width: 700px) {
+    .site-slider-track {
+        aspect-ratio: 4 / 3;
+        min-height: 220px;
+    }
+
+    .site-slider[data-transition="slide"] .site-slider-track {
+        height: clamp(220px, 60vw, 380px);
+    }
+
+    .site-slide-caption {
+        padding: 16px 20px 44px;
+    }
+
+    .site-slider-btn {
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
+    }
+
+    .site-slider-prev {
+        inset-inline-start: 8px;
+    }
+
+    .site-slider-next {
+        inset-inline-end: 8px;
+    }
+}
+
+/* کاربرانی که کاهش حرکت خواسته‌اند: بدون گذار نرم */
+@media (prefers-reduced-motion: reduce) {
+    .site-slide,
+    .site-slider[data-transition="slide"] .site-slider-track {
+        transition: none;
+    }
+}
+
 .site-feats {
     position: relative;
     overflow: hidden;
@@ -721,7 +898,7 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     background: var(--site-surface);
     color: var(--site-ink);
     box-shadow: 0 4px 18px rgba(11, 52, 91, 0.05);
-    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
 }
 
 .site-cat:hover {
@@ -783,6 +960,14 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
 }
 
+/* خط‌پایهٔ آیکن‌فونت گلیف را بالای وسط دایره می‌اندازد؛ flex آن را دقیقاً وسط می‌کند */
+.site-arrow i {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
 .site-cat:hover .site-arrow {
     border-color: var(--site-red);
     background: var(--site-red);
@@ -811,7 +996,7 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     color: var(--site-ink);
     box-shadow: 0 4px 18px var(--site-shadow);
     overflow: hidden;
-    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
 }
 
 .site-product-card:hover {
@@ -917,6 +1102,13 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     color: #fff;
     font-size: 13px;
     flex: none;
+}
+
+.site-product-arrow i {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
 }
 
 /* ---------- ط³ط±طµظپط­ظ‡ ط¯ط§ط®ظ„غŒ ظˆ ظ…ط³غŒط± ---------- */
@@ -1324,7 +1516,7 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     border-radius: 32px;
     font-size: 12.5px;
     font-weight: 600;
-    transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+    transition: background 0.25s ease, color 0.25s ease, border-color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
 }
 
 .site-btn--red {
@@ -2074,6 +2266,13 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
     padding: 0.5rem;
 }
 
+.slider-image-preview,
+.category-image-preview {
+    width: 100%;
+    max-height: 260px;
+    object-fit: cover;
+}
+
 /* ---------- ط±غŒط³ظ¾ط§ظ†ط³غŒظˆ ---------- */
 
 @media (max-width: 1200px) {
@@ -2429,5 +2628,172 @@ html[data-theme="dark"] .site-shell .btn-outline-secondary {
 
     .site-footer-meta {
         grid-column: auto;
+    }
+}
+
+/* ---------- ادیتور متن غنی صفحات (Jodit) ---------- */
+
+.ash-jodit-editor .jodit-container {
+    font-family: inherit;
+}
+
+/* حاشیه/گردی هم‌راستا با بقیهٔ فیلدهای پنل؛ تم تاریک را خود Jodit با theme اعمال می‌کند */
+.ash-jodit-editor .jodit-container:not(.jodit_inline) {
+    border-color: var(--brand-border, #dadada);
+    border-radius: var(--radius, 8px);
+}
+
+.ash-jodit-editor .jodit-wysiwyg {
+    font-size: 15px;
+    line-height: 1.9;
+}
+
+.ash-jodit-editor .jodit-wysiwyg blockquote {
+    border-inline-start: 3px solid var(--site-red);
+    padding-inline-start: 1em;
+    margin: 1em 0;
+}
+
+/* استایل عناصر غنی در بدنهٔ صفحات؛ content-prose پیش‌تر فقط <p> می‌دید */
+.content-prose h1,
+.content-prose h2,
+.content-prose h3,
+.content-prose h4 {
+    margin: 1.1em 0 0.5em;
+    line-height: 1.5;
+}
+
+.content-prose h1:first-child,
+.content-prose h2:first-child,
+.content-prose h3:first-child,
+.content-prose h4:first-child {
+    margin-top: 0;
+}
+
+.content-prose ul,
+.content-prose ol {
+    padding-inline-start: 1.5em;
+    margin-bottom: 1em;
+    line-height: 1.9;
+}
+
+.content-prose blockquote {
+    border-inline-start: 3px solid var(--site-red);
+    padding-inline-start: 1em;
+    margin: 1em 0;
+    color: inherit;
+    opacity: 0.9;
+}
+
+.content-prose a {
+    color: var(--site-red);
+}
+
+.content-prose img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+}
+
+/* جدول‌های ساخته‌شده در ادیتور بدون حاشیه نامرئی می‌مانند */
+.content-prose table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1em 0;
+}
+
+.content-prose th,
+.content-prose td {
+    border: 1px solid var(--site-line);
+    padding: 8px 10px;
+    text-align: right;
+}
+
+.content-prose th {
+    background: var(--site-alt);
+}
+
+/* ---------- لایهٔ حرکتی ----------
+   فقط opacity و transform/translate؛ بدون کتابخانه. کلاس‌های reveal را site.js
+   می‌زند، پس بدون JS و در print محتوا کامل دیده می‌شود. مدت‌ها عمداً کوتاه
+   (۲۰۰ تا ۴۰۰ میلی‌ثانیه) و دامنه کم است تا کاتالوگ کند و شلوغ به نظر نرسد. */
+
+/* translate مستقل از transform است تا با hoverِ بالاآمدن کارت‌ها تداخل نکند */
+.site-reveal:not(.is-revealed) {
+    opacity: 0;
+    translate: 0 14px;
+}
+
+/* transition روی حالت مقصد: افزودن کلاس پنهان‌کننده نباید خودش محو بسازد */
+.site-reveal.is-revealed {
+    opacity: 1;
+    translate: 0 0;
+    transition: opacity 0.32s ease, translate 0.32s ease;
+}
+
+.site-product-media img,
+.site-cat-media img {
+    transition: transform 0.3s ease;
+}
+
+.site-product-card:hover .site-product-media img,
+.site-cat:hover .site-cat-media img {
+    transform: scale(1.05);
+}
+
+.site-btn:hover,
+.site-cta:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 22px var(--site-shadow);
+}
+
+/* محو کوتاه ناوبری افزانه: سربرگ/پابرگ ثابت می‌مانند، فقط محتوا محو می‌شود */
+.site-main {
+    transition: opacity 0.22s ease;
+}
+
+html.site-nav-leaving .site-main {
+    opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .site-reveal,
+    .site-reveal.is-revealed {
+        opacity: 1;
+        translate: none;
+        transition: none;
+    }
+
+    .site-main {
+        transition: none;
+    }
+
+    html.site-nav-leaving .site-main {
+        opacity: 1;
+    }
+
+    .site-product-card,
+    .site-cat,
+    .site-btn,
+    .site-cta,
+    .site-product-media img,
+    .site-cat-media img {
+        transition: none;
+    }
+
+    .site-product-card:hover,
+    .site-cat:hover,
+    .site-btn:hover,
+    .site-cta:hover,
+    .site-product-card:hover .site-product-media img,
+    .site-cat:hover .site-cat-media img {
+        transform: none;
+    }
+}
+
+@media print {
+    .site-reveal {
+        opacity: 1 !important;
+        translate: none !important;
     }
 }

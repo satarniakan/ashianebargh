@@ -6,6 +6,7 @@
 @using Ashianebargh.Domain.Identity
 @inject IProductService ProductService
 @inject ICategoryService CategoryService
+@inject IHomeSliderService SliderService
 @inject ISettingService SettingService
 @inject IServiceScopeFactory ScopeFactory
 @inject SiteLanguage Language
@@ -15,6 +16,58 @@
 <SeoMeta Title="@Language["home.title"]" Description="@Language["home.lead"]" Path="/" SiteName="@siteName"
          JsonLd="@JsonLdBlocks" />
 
+@if (slider is not null && slider.Enabled && slider.Slides.Count > 0)
+{
+    <section class="site-slider" data-home-slider data-transition="@slider.Transition"
+             data-interval="@(slider.IntervalSeconds * 1000)"
+             aria-roledescription="carousel" aria-label="@Language["home.slider"]">
+        <div class="site-slider-track">
+            @for (var i = 0; i < slider.Slides.Count; i++)
+            {
+                var slide = slider.Slides[i];
+                var slideTitle = LocalizedText.Pick(Language.IsEnglish, slide.TitleEn, slide.Title);
+                var hasCaption = !string.IsNullOrWhiteSpace(slideTitle);
+                var slideClass = "site-slide" + (i == 0 ? " is-active" : "") + (hasCaption ? " has-caption" : "");
+                <div class="@slideClass" role="group"
+                     aria-roledescription="slide"
+                     aria-label="@SlideLabel(i)"
+                     aria-hidden="@(i != 0 ? "true" : null)">
+                    <img src="/media/slider/@slide.ImageStorageId?w=1200"
+                         srcset="/media/slider/@slide.ImageStorageId?w=800 800w,
+                                 /media/slider/@slide.ImageStorageId?w=1200 1200w"
+                         sizes="100vw"
+                         alt="@(hasCaption ? slideTitle : SlideLabel(i))" width="1200" height="450"
+                         loading="@(i == 0 ? "eager" : "lazy")" decoding="async" />
+                    @if (hasCaption)
+                    {
+                        <div class="site-slide-caption"><h2>@slideTitle</h2></div>
+                    }
+                </div>
+            }
+        </div>
+        @if (slider.Slides.Count > 1)
+        {
+            <button type="button" class="site-slider-btn site-slider-prev" data-slider-prev
+                    aria-label="@Language["home.sliderPrev"]">
+                <i class="bi @Language.PreviousIcon" aria-hidden="true"></i>
+            </button>
+            <button type="button" class="site-slider-btn site-slider-next" data-slider-next
+                    aria-label="@Language["home.sliderNext"]">
+                <i class="bi @Language.NextIcon" aria-hidden="true"></i>
+            </button>
+            <div class="site-slider-dots">
+                @for (var i = 0; i < slider.Slides.Count; i++)
+                {
+                    var dot = i;
+                    <button type="button" class="site-slider-dot@(dot == 0 ? " is-active" : "")"
+                            data-slider-dot="@dot" aria-label="@GoToLabel(dot)"></button>
+                }
+            </div>
+        }
+    </section>
+}
+else
+{
 <section class="site-hero">
     <div class="site-container site-hero-inner">
         <div class="site-hero-text">
@@ -66,6 +119,7 @@
         </div>
     </div>
 </section>
+}
 
 <section class="site-feats">
     <div class="site-container">
@@ -106,9 +160,17 @@
                         <span class="site-cat-media">
                             @if (!string.IsNullOrEmpty(category.ImageStorageId))
                             {
-                                <img src="/media/products/@(category.ImageStorageId)?w=320"
-                                     srcset="/media/products/@(category.ImageStorageId)?w=160 160w,
-                                             /media/products/@(category.ImageStorageId)?w=320 320w"
+                                <img src="/media/category/@(category.ImageStorageId)?w=320"
+                                     srcset="/media/category/@(category.ImageStorageId)?w=160 160w,
+                                             /media/category/@(category.ImageStorageId)?w=320 320w"
+                                     sizes="(max-width: 700px) 45vw, 240px"
+                                     alt="" width="320" height="240" loading="lazy" decoding="async" />
+                            }
+                            else if (!string.IsNullOrEmpty(category.FallbackImageStorageId))
+                            {
+                                <img src="/media/products/@(category.FallbackImageStorageId)?w=320"
+                                     srcset="/media/products/@(category.FallbackImageStorageId)?w=160 160w,
+                                             /media/products/@(category.FallbackImageStorageId)?w=320 320w"
                                      sizes="(max-width: 700px) 45vw, 240px"
                                      alt="" width="320" height="240" loading="lazy" decoding="async" />
                             }
@@ -176,11 +238,19 @@
 @code {
     private List<ProductCardDto> featured = new();
     private List<CategoryListItemDto> categories = new();
+    private HomeSliderPublicDto? slider;
     private string siteName = "آشیانه برق";
     private string? heroImage;
     private int productCount;
 
     private string T(string key) => Language[key];
+
+    private string SlideLabel(int index) => string.Format(
+        System.Globalization.CultureInfo.InvariantCulture, Language["home.sliderOf"],
+        index + 1, slider!.Slides.Count);
+
+    private string GoToLabel(int index) => string.Format(
+        System.Globalization.CultureInfo.InvariantCulture, Language["home.sliderGoTo"], index + 1);
 
     /// <summary>داده‌ساختاریافتهٔ سازمان برای صفحهٔ اول (نام، آدرس و لوگو).</summary>
     private IReadOnlyList<string> JsonLdBlocks =>
@@ -213,8 +283,9 @@
             siteName = await settings.GetAsync(FrameworkSettingKeys.SiteName) ?? siteName;
         }
 
-        featured = await ProductService.GetFeaturedAsync(8);
+        featured = await ProductService.GetFeaturedAsync(12);
         categories = await CategoryService.GetActiveAsync();
+        slider = await SliderService.GetPublicAsync();
 
         var total = await ProductService.GetPublicPagedAsync(new PublicProductFilter { Page = 1, PageSize = 1 });
         productCount = total.TotalCount;

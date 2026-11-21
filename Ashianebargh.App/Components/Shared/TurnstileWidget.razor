@@ -1,6 +1,6 @@
 @using Ashianebargh.Application.Services
 @using Ashianebargh.Domain.Identity
-@inject ISettingService Settings
+@inject IServiceScopeFactory ScopeFactory
 
 @* ویجت کپچای Turnstile — یک پیاده‌سازی مشترک برای همهٔ فرم‌های ورود/تعیین رمز.
    کلید عمومی از تنظیمات می‌آید (ردیف دیتابیس، وگرنه appsettings)؛ خالی یعنی کپچا
@@ -18,7 +18,12 @@
 
     protected override async Task OnInitializedAsync()
     {
-        siteKey = await Settings.GetEffectiveAsync(
+        // صفحه‌ای مثل تماس با ما هم‌زمان با رندر ویجت، کوئری DbContext مشترک دارد
+        // (پیش‌پر فرم استعلام)؛ خواندن کلید باید در scope جدا باشد وگرنه
+        // «second operation on this context» می‌گیریم.
+        await using var scope = ScopeFactory.CreateAsyncScope();
+        var settings = scope.ServiceProvider.GetRequiredService<ISettingService>();
+        siteKey = await settings.GetEffectiveAsync(
             IntegrationSettingKeys.TurnstileSiteKey, "Captcha:Turnstile:SiteKey");
         if (string.IsNullOrWhiteSpace(siteKey))
             siteKey = null;

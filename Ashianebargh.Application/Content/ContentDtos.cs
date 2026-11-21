@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Ashianebargh.Domain.Content;
 
 namespace Ashianebargh.Application.Content;
 
@@ -18,6 +19,9 @@ public sealed class CategoryEditDto
     [StringLength(1000, ErrorMessage = "توضیح حداکثر ۱۰۰۰ نویسه است.")]
     public string? Description { get; set; }
 
+    /// <summary>فقط خواندنی در فرم؛ تعویض تصویر از SetImageAsync می‌گذرد تا فایل قبلی پاک شود.</summary>
+    public string? ImageStorageId { get; set; }
+
     [Range(0, 100000, ErrorMessage = "ترتیب باید بین ۰ تا ۱۰۰٬۰۰۰ باشد.")]
     public int SortOrder { get; set; }
 
@@ -26,7 +30,8 @@ public sealed class CategoryEditDto
 
 public sealed record CategoryListItemDto(
     int Id, string Name, string Slug, string? Description,
-    bool IsActive, int SortOrder, int ProductCount, string? ImageStorageId);
+    bool IsActive, int SortOrder, int ProductCount,
+    string? ImageStorageId, string? FallbackImageStorageId);
 
 // ---------- برچسب ----------
 
@@ -74,11 +79,9 @@ public sealed class ProductEditDto
     [StringLength(500, ErrorMessage = "English short description max 500 characters.")]
     public string? ShortDescriptionEn { get; set; }
 
-    [StringLength(1000, ErrorMessage = "Description max 1000 characters.")]
     public string? Description { get; set; }
 
     /// <summary>Description in English</summary>
-    [StringLength(1000, ErrorMessage = "English description max 1000 characters.")]
     public string? DescriptionEn { get; set; }
 
     [Range(typeof(decimal), "0", "999999999999", ErrorMessage = "Price cannot be negative.")]
@@ -253,3 +256,39 @@ public sealed class ContactFormDto
 public sealed record ContactMessageDto(
     int Id, string Name, string Phone, string? Email, string? Subject,
     string Message, bool IsRead, DateTime CreatedAt);
+
+// ---------- اسلایدر صفحهٔ اول ----------
+
+public sealed record HomeSlideListItemDto(
+    int Id, string? Title, string? TitleEn, string? ImageStorageId, bool IsActive, int SortOrder);
+
+public sealed class HomeSlideEditDto
+{
+    public int Id { get; set; }
+
+    [StringLength(150, ErrorMessage = "متن اسلاید حداکثر ۱۵۰ نویسه است.")]
+    public string? Title { get; set; }
+
+    [StringLength(150, ErrorMessage = "متن انگلیسی حداکثر ۱۵۰ نویسه است.")]
+    public string? TitleEn { get; set; }
+
+    public string? ImageStorageId { get; set; }
+    public bool IsActive { get; set; } = true;
+    public int SortOrder { get; set; }
+}
+
+public sealed record HomeSlideViewDto(string? Title, string? TitleEn, string ImageStorageId);
+
+public sealed record HomeSliderPublicDto(
+    bool Enabled, string Transition, int IntervalSeconds, IReadOnlyList<HomeSlideViewDto> Slides);
+
+public sealed class HomeSliderSettingsDto
+{
+    public bool Enabled { get; set; } = SliderSettingKeys.DefaultEnabled;
+
+    public string Transition { get; set; } = SliderSettingKeys.DefaultTransition;
+
+    [Range(SliderSettingKeys.MinIntervalSeconds, SliderSettingKeys.MaxIntervalSeconds,
+        ErrorMessage = "زمان نمایش باید بین ۲ و ۶۰ ثانیه باشد.")]
+    public int IntervalSeconds { get; set; } = SliderSettingKeys.DefaultIntervalSeconds;
+}

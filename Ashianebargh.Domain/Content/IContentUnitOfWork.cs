@@ -20,6 +20,7 @@ public interface IContentRepository
     IQueryable<ProductImage> ProductImages { get; }
 
     IQueryable<Page> Pages { get; }
+    IQueryable<HomeSlide> HomeSlides { get; }
     IQueryable<ContactInfo> ContactInfos { get; }
     IQueryable<ContactMessage> ContactMessages { get; }
 

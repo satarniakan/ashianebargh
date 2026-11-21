@@ -265,4 +265,47 @@ public class ProductSearchAndFilesTests
         Assert.Equal("real-id", dto.StorageId);
         Assert.Single(await db.ProductFiles.ToListAsync());
     }
+
+    [Fact]
+    public async Task AttachImage_RejectsStorageId_ThatDoesNotExist()
+    {
+        var (db, uow, storage) = Build();
+        await using var _ = db;
+        var category = await SeedCategoryAsync(db);
+        var product = await SeedProductAsync(db, category, "AFF", "AFF-01");
+
+        storage.Setup(s => s.ExistsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+            .ReturnsAsync(false);
+
+        var service = new ProductService(uow, storage.Object, NullLogger<ProductService>.Instance);
+
+        // رگرسیون: storageId جعلی/ناموجود نباید به گالری و مسیر رسانهٔ عمومی وصل شود.
+        await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            service.AttachImageAsync(product.Id, "ghost-id"));
+        Assert.Empty(await uow.Content.ProductImages.ToListAsync());
+    }
+
+    [Fact]
+    public async Task AttachImage_AppendsAfterExistingGalleryImages()
+    {
+        var (db, uow, storage) = Build();
+        await using var _ = db;
+        var category = await SeedCategoryAsync(db);
+        var product = await SeedProductAsync(db, category, "AFF", "AFF-01");
+
+        storage.Setup(s => s.ExistsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+            .ReturnsAsync(true);
+
+        var service = new ProductService(uow, storage.Object, NullLogger<ProductService>.Instance);
+        await using var stream = new MemoryStream(Encoding.UTF8.GetBytes("img"));
+        var first = await service.AddImageAsync(product.Id, stream, "a.png");
+
+        var second = await service.AttachImageAsync(product.Id, "real-id");
+
+        var rows = await uow.Content.ProductImages.OrderBy(i => i.SortOrder).ToListAsync();
+        Assert.Equal(2, rows.Count);
+        Assert.Equal(first.StorageId, rows[0].StorageId);
+        Assert.Equal("real-id", rows[1].StorageId);
+        Assert.Equal(rows[0].SortOrder + 1, rows[1].SortOrder);
+    }
 }

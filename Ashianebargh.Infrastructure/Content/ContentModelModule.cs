@@ -17,6 +17,7 @@ public sealed class ContentModelModule : IAshianebarghModule
             e.Property(x => x.Name).HasMaxLength(150).IsRequired();
             e.Property(x => x.Slug).HasMaxLength(150).IsRequired();
             e.Property(x => x.Description).HasMaxLength(1000);
+            e.Property(x => x.ImageStorageId).HasMaxLength(100);
             e.HasIndex(x => x.Slug).IsUnique().HasFilter("[IsDeleted] = 0");
             e.HasIndex(x => new { x.IsActive, x.SortOrder });
         });
@@ -108,6 +109,15 @@ public sealed class ContentModelModule : IAshianebarghModule
             e.Property(x => x.Title).HasMaxLength(200).IsRequired();
             e.HasIndex(x => new { x.PageId, x.LanguageCode }).IsUnique().HasFilter("[IsDeleted] = 0");
             e.HasIndex(x => x.LanguageCode);
+        });
+
+        builder.Entity<HomeSlide>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Title).HasMaxLength(150);
+            e.Property(x => x.TitleEn).HasMaxLength(150);
+            e.Property(x => x.ImageStorageId).HasMaxLength(100);
+            e.HasIndex(x => new { x.IsActive, x.SortOrder });
         });
 
         builder.Entity<ContactInfo>(e =>

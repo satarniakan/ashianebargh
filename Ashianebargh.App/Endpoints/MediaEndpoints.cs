@@ -67,6 +67,100 @@ public static class MediaEndpoints
         })
         .AllowAnonymous();
 
+        // تصاویر اسلایدر صفحهٔ اول — فقط تصویر اسلاید فعال سرو می‌شود.
+        app.MapGet("/media/slider/{storageId}", async (
+            HttpContext http,
+            IFileStorage storage,
+            IHomeSliderService slider,
+            ImageVariantService variants,
+            string storageId,
+            int? w,
+            CancellationToken cancellationToken) =>
+        {
+            if (!IsSafeStorageId(storageId))
+                return Results.NotFound();
+
+            if (!await slider.IsImagePublicAsync(storageId))
+                return Results.NotFound();
+
+            if (!await storage.ExistsAsync(ContentStorage.Owner, ContentStorage.SliderImageType, storageId))
+                return Results.NotFound();
+
+            if (!ContentTypes.TryGetContentType(storageId, out var contentType) ||
+                !contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+                return Results.NotFound();
+
+            http.Response.Headers.CacheControl = "public, max-age=604800, immutable";
+            http.Response.Headers["X-Content-Type-Options"] = "nosniff";
+
+            if (w is int requestedWidth && ImageVariantService.IsAllowedWidth(requestedWidth))
+            {
+                var variantPath = await variants.GetOrCreateAsync(
+                    storageId,
+                    ct => storage.OpenReadAsync(ContentStorage.Owner, ContentStorage.SliderImageType, storageId),
+                    contentType,
+                    requestedWidth,
+                    cancellationToken);
+
+                if (variantPath is not null)
+                    return Results.File(variantPath, "image/webp");
+            }
+
+            var stream = await storage.OpenReadAsync(ContentStorage.Owner, ContentStorage.SliderImageType, storageId);
+            if (stream is null)
+                return Results.NotFound();
+
+            return Results.Stream(stream, contentType);
+        })
+        .AllowAnonymous();
+
+        // تصویر اختصاصی دسته — فقط تصویر دستهٔ فعال سرو می‌شود.
+        app.MapGet("/media/category/{storageId}", async (
+            HttpContext http,
+            IFileStorage storage,
+            ICategoryService categories,
+            ImageVariantService variants,
+            string storageId,
+            int? w,
+            CancellationToken cancellationToken) =>
+        {
+            if (!IsSafeStorageId(storageId))
+                return Results.NotFound();
+
+            if (!await categories.IsImagePublicAsync(storageId))
+                return Results.NotFound();
+
+            if (!await storage.ExistsAsync(ContentStorage.Owner, ContentStorage.CategoryImageType, storageId))
+                return Results.NotFound();
+
+            if (!ContentTypes.TryGetContentType(storageId, out var contentType) ||
+                !contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+                return Results.NotFound();
+
+            http.Response.Headers.CacheControl = "public, max-age=604800, immutable";
+            http.Response.Headers["X-Content-Type-Options"] = "nosniff";
+
+            if (w is int requestedWidth && ImageVariantService.IsAllowedWidth(requestedWidth))
+            {
+                var variantPath = await variants.GetOrCreateAsync(
+                    storageId,
+                    ct => storage.OpenReadAsync(ContentStorage.Owner, ContentStorage.CategoryImageType, storageId),
+                    contentType,
+                    requestedWidth,
+                    cancellationToken);
+
+                if (variantPath is not null)
+                    return Results.File(variantPath, "image/webp");
+            }
+
+            var stream = await storage.OpenReadAsync(ContentStorage.Owner, ContentStorage.CategoryImageType, storageId);
+            if (stream is null)
+                return Results.NotFound();
+
+            return Results.Stream(stream, contentType);
+        })
+        .AllowAnonymous();
+
         app.MapGet("/media/product-files/{storageId}", async (
             HttpContext http,
             IFileStorage storage,

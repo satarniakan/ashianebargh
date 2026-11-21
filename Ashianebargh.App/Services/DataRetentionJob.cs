@@ -101,6 +101,14 @@ public class DataRetentionJob : IRecurringJob
             var keep = (await sp.GetRequiredService<IProductService>().GetPublicImageStorageIdsAsync())
                 .ToHashSet(StringComparer.Ordinal);
 
+            // تصاویر اسلایدر هم در همان کش نسخه می‌سازند؛ بدون این، خانه‌تکانی پاکشان می‌کرد.
+            foreach (var id in await sp.GetRequiredService<IHomeSliderService>().GetPublicImageStorageIdsAsync())
+                keep.Add(id);
+
+            // تصویر اختصاصی دسته هم همین‌طور؛ کارت دسته در صفحهٔ اول نسخهٔ ?w= می‌گیرد.
+            foreach (var id in await sp.GetRequiredService<ICategoryService>().GetPublicImageStorageIdsAsync())
+                keep.Add(id);
+
             var removed = sp.GetRequiredService<ImageVariantService>().Prune(keep, now.AddDays(-days));
             if (removed > 0)
                 _logger.LogInformation("خانه‌تکانی کش تصویر: {Count} فایل حذف شد", removed);

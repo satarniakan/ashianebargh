@@ -12,4 +12,10 @@ public static class ContentStorage
 
     /// <summary>کاتالوگ عمومی سایت (یک‌بار ذخیره می‌شود، نه برای هر محصول).</summary>
     public const string CatalogType = "site-catalog";
+
+    /// <summary>تصاویر اسلایدر صفحهٔ اول.</summary>
+    public const string SliderImageType = "slider-image";
+
+    /// <summary>تصویر اختصاصی دسته؛ نبودش یعنی کارت دسته از تصویر محصول یا آیکن استفاده می‌کند.</summary>
+    public const string CategoryImageType = "category-image";
 }

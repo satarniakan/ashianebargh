@@ -1,0 +1,24 @@
+@* Ashianebargh.App/Components/Shared/RichContent.razor *@
+@* رندر بدنهٔ صفحات محتوا: متن سادهٔ قبلی → پاراگراف‌بندی خطی؛ HTML → پالایش فهرست‌سفید و رندر *@
+@using Ashianebargh.Application.Helpers
+
+@if (!string.IsNullOrWhiteSpace(Text))
+{
+    <div class="content-prose">
+        @if (HtmlContentSanitizer.ContainsMarkup(Text))
+        {
+            @((MarkupString)HtmlContentSanitizer.Sanitize(Text))
+        }
+        else
+        {
+            @foreach (var paragraph in Text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                <p>@paragraph</p>
+            }
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public string? Text { get; set; }
+}
